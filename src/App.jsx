@@ -105,7 +105,12 @@ function App() {
         type="file"
         id="folder-upload-toolbar"
         className="hidden"
-        {...{ webkitdirectory: "", directory: "" }}
+        ref={input => {
+          if (input) {
+            input.setAttribute('webkitdirectory', '');
+            input.setAttribute('directory', '');
+          }
+        }}
         onChange={(e) => {
           if (e.target.files && e.target.files.length > 0) {
             const file = e.target.files[0];
