@@ -1,11 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Dropzone } from './features/viewer/Dropzone';
 import { ImageViewer } from './features/viewer/ImageViewer';
 import { ImageCropper } from './features/editor/ImageCropper';
 import { Button } from './components/ui/Button';
-import { Crop, X, Trash2, Download, Camera, FolderOpen } from 'lucide-react';
+import { Crop, Trash2, Download, Camera, FolderOpen, ChevronLeft, ChevronRight } from 'lucide-react';
 import { captureScreen } from './utils/capture';
+import { useFileSystem } from './hooks/useFileSystem';
 
 function App() {
   // Load a default image or folder if needed
@@ -13,13 +14,30 @@ function App() {
   // We will stick to the requested "Open File" flow but optimize for folder selection if possible or just clarify the file picker is the way.
   // Actually, user wants "Load Folder". We can support `webkitdirectory` attribute input.
 
-  const [image, setImage] = useState(null);
+  const { currentImage, nextImage, prevImage, loadFolder, files } = useFileSystem();
+
+  // Local state for edits/UI
+  const [localImage, setLocalImage] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
 
+  // Sync file system image with local view unless editing
+  useEffect(() => {
+    if (currentImage && !isEditing) {
+      // Need to format as file:// URL for generic HTML img tag if it's absolute path
+      // Electron handles local paths often, but file:// is safer
+      setLocalImage(`file://${currentImage}`);
+    } else if (!currentImage && localImage && !isEditing) {
+      // If currentImage becomes null (e.g., folder cleared), clear localImage
+      setLocalImage(null);
+    }
+  }, [currentImage, isEditing]);
+
   const handleImageUpload = (imgSrc) => {
-    setImage(imgSrc);
+    setLocalImage(imgSrc);
     setIsEditing(false);
+    // Note: Dropzone upload breaks the "Gallery" flow temporarily until user picks a folder again
+    // For MVP, this is fine.
   };
 
 
@@ -27,49 +45,94 @@ function App() {
     setIsCapturing(true);
     const screenshot = await captureScreen();
     if (screenshot) {
-      setImage(screenshot);
+      setLocalImage(screenshot);
       setIsEditing(true); // Immediately enter crop mode for "Regional Capture" feel
     }
     setIsCapturing(false);
   };
 
   const handleOpenFile = () => {
-    document.getElementById('file-upload-toolbar').click();
+    // If we really want folder opening:
+    if (window.require) {
+      // const { ipcRenderer } = window.require('electron');
+      document.getElementById('folder-upload-toolbar').click();
+    } else {
+      document.getElementById('file-upload-toolbar').click();
+    }
   };
 
   const handleCropComplete = (croppedImg) => {
-    setImage(croppedImg);
+    setLocalImage(croppedImg);
     setIsEditing(false);
   };
 
   const handleClear = () => {
     if (confirm("Close image?")) {
-      setImage(null);
+      setLocalImage(null);
       setIsEditing(false);
     }
   };
 
+  // Keyboard Navigation
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (isEditing) return;
+      if (e.key === 'ArrowRight') nextImage();
+      if (e.key === 'ArrowLeft') prevImage();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isEditing, nextImage, prevImage]);
+
   return (
     <div className="h-screen w-screen bg-background overflow-hidden relative select-none">
 
-      {/* Hidden Global File Input for Toolbar */}
+      {/* Hidden Inputs */}
       <input
         type="file"
-        accept="image/*"
-        className="hidden"
         id="file-upload-toolbar"
+        className="hidden"
         onChange={(e) => {
           if (e.target.files && e.target.files[0]) {
-            const reader = new FileReader();
-            reader.onload = (ev) => handleImageUpload(ev.target.result);
-            reader.readAsDataURL(e.target.files[0]);
+            // If standard file pick, just show it. 
+            // (Ideally we would find its parent folder and load that, but browser security blocks path)
+            // In Electron we get the path!
+            const file = e.target.files[0];
+            if (file.path) {
+              // Determine folder
+              const path = window.require('path');
+              const dir = path.dirname(file.path);
+              loadFolder(dir);
+            } else {
+              const reader = new FileReader();
+              reader.onload = (ev) => handleImageUpload(ev.target.result);
+              reader.readAsDataURL(file);
+            }
           }
         }}
       />
 
-      {/* 1. Upload View */}
+      {/* Folder Picker Input Habit */}
+      <input
+        type="file"
+        id="folder-upload-toolbar"
+        className="hidden"
+        {...{ webkitdirectory: "", directory: "" }}
+        onChange={(e) => {
+          if (e.target.files && e.target.files.length > 0) {
+            const file = e.target.files[0];
+            if (file.path) {
+              const path = window.require('path');
+              const dir = path.dirname(file.path);
+              loadFolder(dir);
+            }
+          }
+        }}
+      />
+
+      {/* 1. Upload View (Empty State) */}
       <AnimatePresence>
-        {!image && (
+        {!localImage && (
           <>
             <Dropzone onImageUpload={handleImageUpload} />
 
@@ -85,7 +148,7 @@ function App() {
                 className="bg-surface/50 hover:bg-surface border border-white/10 text-white px-6 py-3 rounded-full shadow-lg backdrop-blur-md"
               >
                 <FolderOpen className="mr-2" size={20} />
-                Open File
+                Open Folder
               </Button>
 
               <Button
@@ -104,7 +167,7 @@ function App() {
 
       {/* 2. Main Viewer & Editor */}
       <AnimatePresence mode="wait">
-        {image && isEditing ? (
+        {localImage && isEditing ? (
           <motion.div
             key="editor"
             initial={{ opacity: 0, scale: 0.98 }}
@@ -113,12 +176,12 @@ function App() {
             className="absolute inset-0 z-20"
           >
             <ImageCropper
-              imageSrc={image}
+              imageSrc={localImage}
               onCancel={() => setIsEditing(false)}
               onComplete={handleCropComplete}
             />
           </motion.div>
-        ) : image ? (
+        ) : localImage ? (
           <motion.div
             key="viewer"
             initial={{ opacity: 0 }}
@@ -126,7 +189,19 @@ function App() {
             exit={{ opacity: 0 }}
             className="absolute inset-0 flex flex-col items-center justify-center p-4 z-10"
           >
-            <ImageViewer src={image} />
+            <ImageViewer src={localImage} />
+
+            {/* Gallery Navigation Arrows (Only if we have multiple files) */}
+            {files.length > 1 && (
+              <>
+                <button onClick={prevImage} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/50 hover:text-white p-4 z-50">
+                  <ChevronLeft size={40} />
+                </button>
+                <button onClick={nextImage} className="absolute right-4 top-1/2 -translate-y-1/2 text-white/50 hover:text-white p-4 z-50">
+                  <ChevronRight size={40} />
+                </button>
+              </>
+            )}
 
             {/* Viewer Toolbar */}
             <motion.div
@@ -150,7 +225,7 @@ function App() {
                 variant="ghost"
                 onClick={handleOpenFile}
                 className="text-white hover:text-white/80"
-                title="Open Image"
+                title="Open Folder"
               >
                 <FolderOpen size={20} />
               </Button>
@@ -176,7 +251,7 @@ function App() {
                 onClick={() => {
                   const link = document.createElement('a');
                   link.download = `repic-${Date.now()}.png`;
-                  link.href = image;
+                  link.href = localImage;
                   link.click();
                 }}
                 className="text-white hover:text-primary"
