@@ -8,6 +8,11 @@ import { Crop, X, Trash2, Download, Camera, FolderOpen } from 'lucide-react';
 import { captureScreen } from './utils/capture';
 
 function App() {
+  // Load a default image or folder if needed
+  // For MVP, we can't easily "auto-load Desktop" without Node.js 'fs' access which is tricky in Renderer without preload exposure.
+  // We will stick to the requested "Open File" flow but optimize for folder selection if possible or just clarify the file picker is the way.
+  // Actually, user wants "Load Folder". We can support `webkitdirectory` attribute input.
+
   const [image, setImage] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
@@ -16,6 +21,7 @@ function App() {
     setImage(imgSrc);
     setIsEditing(false);
   };
+
 
   const handleScreenshot = async () => {
     setIsCapturing(true);
