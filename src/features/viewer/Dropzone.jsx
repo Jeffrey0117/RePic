@@ -1,0 +1,99 @@
+import { useState, useCallback } from 'react';
+import { Upload, Image as ImageIcon } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import clsx from 'clsx';
+import { Button } from '../../components/ui/Button';
+
+export const Dropzone = ({ onImageUpload }) => {
+    const [isDragActive, setIsDragActive] = useState(false);
+
+    const handleDrag = useCallback((e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.type === 'dragenter' || e.type === 'dragover') {
+            setIsDragActive(true);
+        } else if (e.type === 'dragleave') {
+            setIsDragActive(false);
+        }
+    }, []);
+
+    const handleDrop = useCallback((e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragActive(false);
+
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+            const file = e.dataTransfer.files[0];
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    onImageUpload(event.target.result);
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+    }, [onImageUpload]);
+
+    const handleFileInput = (e) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    onImageUpload(event.target.result);
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+    };
+
+    return (
+        <div
+            className={clsx(
+                "fixed inset-0 flex items-center justify-center transition-colors duration-200",
+                isDragActive ? "bg-primary/20 backdrop-blur-sm" : "bg-background"
+            )}
+            onDragEnter={handleDrag}
+            onDragLeave={handleDrag}
+            onDragOver={handleDrag}
+            onDrop={handleDrop}
+        >
+            <AnimatePresence>
+                <motion.div
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="text-center p-10 border-2 border-dashed border-zinc-700 rounded-3xl bg-surface/50 max-w-xl w-full mx-4"
+                >
+                    <div className="flex flex-col items-center gap-4 pointer-events-none">
+                        <div className="p-4 bg-zinc-800 rounded-full text-zinc-400">
+                            <ImageIcon size={48} />
+                        </div>
+                        <div className="space-y-1">
+                            <h2 className="text-xl font-semibold text-white">
+                                {isDragActive ? "Drop to open" : "Quick View"}
+                            </h2>
+                            <p className="text-text-secondary">
+                                Drag and drop an image here, or click to browse
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="mt-8">
+                        <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            id="file-upload"
+                            onChange={handleFileInput}
+                        />
+                        <label htmlFor="file-upload">
+                            <Button variant="primary" icon={Upload} className="pointer-events-auto w-full justify-center">
+                                Select Image
+                            </Button>
+                        </label>
+                    </div>
+                </motion.div>
+            </AnimatePresence>
+        </div>
+    );
+};
