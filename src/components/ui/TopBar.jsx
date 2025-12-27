@@ -1,42 +1,71 @@
-import { useRef } from 'react';
 import { motion } from 'framer-motion';
-import { FolderOpen, ArrowLeft } from 'lucide-react';
+import {
+    FolderOpen,
+    RotateCcw,
+    Copy,
+    Scissors,
+    Trash2,
+    Search,
+    LayoutGrid,
+    Settings,
+    Maximize,
+    Download,
+    Camera
+} from 'lucide-react';
 import { Button } from './Button';
 
-export const TopBar = ({ currentPath, onOpenFolder, onBack }) => {
-    // We display the folder name, and maybe full path on hover?
-    // Using window.require to get path module safely if needed, but we have the string path.
+export const TopBar = ({ currentPath, onOpenFolder, onScreenshot, onEdit, onClear, onSave }) => {
     const folderName = currentPath
         ? (window.require ? window.require('path').basename(currentPath) : currentPath)
-        : "No Folder Selected";
+        : "Open Folder";
 
     return (
         <motion.div
             initial={{ y: -50, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            className="absolute top-0 left-0 right-0 h-16 bg-surface/80 backdrop-blur-md border-b border-white/10 flex items-center justify-between px-6 z-30"
+            className="h-14 w-full bg-surface/30 backdrop-blur-xl border-b border-white/5 flex items-center justify-between px-6 z-30"
         >
-            <div className="flex items-center gap-4">
-                {/* Logo or App Name could go here */}
-                <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-                    Repic
-                </h1>
+            {/* Left: Folder Info */}
+            <div
+                className="flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-lg cursor-pointer transition-all border border-white/5"
+                onClick={onOpenFolder}
+            >
+                <FolderOpen size={16} className="text-primary" />
+                <span className="text-xs font-medium text-white/80 max-w-[200px] truncate">{folderName}</span>
             </div>
 
-            <div className="flex items-center gap-4">
-                <div
-                    className="flex items-center gap-2 px-4 py-2 bg-black/20 rounded-full border border-white/5 text-sm text-gray-300 hover:text-white cursor-pointer transition-colors max-w-lg truncate"
-                    title={currentPath}
-                    onClick={onOpenFolder}
-                >
-                    <FolderOpen size={16} className="text-primary" />
-                    <span className="truncate">{folderName}</span>
-                </div>
+            {/* Center: Main Tools */}
+            <div className="flex items-center bg-black/20 rounded-xl p-1 border border-white/5">
+                <ToolButton icon={RotateCcw} title="Refresh/Reset" onClick={() => window.location.reload()} />
+                <ToolButton icon={Copy} title="Copy" onClick={() => { }} />
+                <ToolButton icon={Scissors} title="Edit Area" onClick={onEdit} />
+                <ToolButton icon={Trash2} title="Delete" className="text-danger" onClick={onClear} />
+                <div className="w-[1px] h-4 bg-white/10 mx-1"></div>
+                <ToolButton icon={Search} title="Zoom/Search" />
+                <ToolButton icon={LayoutGrid} title="Gallery View" />
+                <ToolButton icon={Settings} title="Settings" />
+                <ToolButton icon={Camera} title="Screenshot" onClick={onScreenshot} />
             </div>
 
+            {/* Right: Actions */}
             <div className="flex items-center gap-2">
-                {/* Right side items if needed, maybe settings? */}
+                <Button variant="ghost" className="h-9 w-9 p-0 rounded-lg hover:bg-white/5" onClick={onSave}>
+                    <Download size={18} className="text-white/70 hover:text-primary transition-colors" />
+                </Button>
+                <Button variant="ghost" className="h-9 w-9 p-0 rounded-lg hover:bg-white/5">
+                    <Maximize size={18} className="text-white/70" />
+                </Button>
             </div>
         </motion.div>
     );
 };
+
+const ToolButton = ({ icon: Icon, title, onClick, className = "" }) => (
+    <button
+        onClick={onClick}
+        title={title}
+        className={`p-2 hover:bg-white/10 rounded-lg transition-all text-white/60 hover:text-white ${className}`}
+    >
+        <Icon size={18} />
+    </button>
+);

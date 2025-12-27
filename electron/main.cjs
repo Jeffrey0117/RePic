@@ -1,5 +1,6 @@
 const { app, BrowserWindow, Menu, ipcMain, desktopCapturer, dialog } = require('electron');
 const path = require('path');
+const fs = require('fs');
 
 let mainWindow;
 
@@ -57,6 +58,20 @@ ipcMain.handle('select-directory', async () => {
     });
     if (result.canceled) return null;
     return result.filePaths[0];
+});
+
+ipcMain.handle('get-file-info', async (event, filePath) => {
+    try {
+        const stats = fs.statSync(filePath);
+        return {
+            size: stats.size,
+            birthtime: stats.birthtime,
+            mtime: stats.mtime
+        };
+    } catch (e) {
+        console.error("Failed to get file info", e);
+        return null;
+    }
 });
 
 app.whenReady().then(() => {

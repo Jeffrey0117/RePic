@@ -10,6 +10,7 @@ export const useFileSystem = () => {
     const [files, setFiles] = useState([]);
     const [currentIndex, setCurrentIndex] = useState(-1);
     const [currentPath, setCurrentPath] = useState(null);
+    const [currentMetadata, setCurrentMetadata] = useState(null);
 
     // Initial Load - Desktop
     useEffect(() => {
@@ -68,6 +69,31 @@ export const useFileSystem = () => {
 
     const currentImage = files[currentIndex] || null;
 
+    useEffect(() => {
+        if (!currentImage || !electron) {
+            setCurrentMetadata(null);
+            return;
+        }
+
+        const fetchInfo = async () => {
+            const info = await electron.ipcRenderer.invoke('get-file-info', currentImage);
+            if (info) {
+                // Also try to get image dimensions
+                const img = new Image();
+                img.onload = () => {
+                    setCurrentMetadata({
+                        ...info,
+                        width: img.naturalWidth,
+                        height: img.naturalHeight
+                    });
+                };
+                img.src = `file://${currentImage}`;
+            }
+        };
+
+        fetchInfo();
+    }, [currentImage]);
+
     return {
         files,
         currentIndex,
@@ -76,6 +102,7 @@ export const useFileSystem = () => {
         nextImage,
         prevImage,
         selectImage,
-        currentPath
+        currentPath,
+        currentMetadata
     };
 };
