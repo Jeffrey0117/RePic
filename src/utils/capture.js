@@ -27,10 +27,10 @@ export async function captureScreen() {
                 mandatory: {
                     chromeMediaSource: 'desktop',
                     chromeMediaSourceId: screenSource.id,
-                    minWidth: 1920,
-                    maxWidth: 4000,
-                    minHeight: 1080,
-                    maxHeight: 4000
+                    minWidth: 1280,
+                    maxWidth: 8000,
+                    minHeight: 720,
+                    maxHeight: 8000
                 }
             }
         });
@@ -38,18 +38,29 @@ export async function captureScreen() {
         // 5. Create video element to grab frame
         const video = document.createElement('video');
         video.srcObject = stream;
-        await new Promise(r => video.onloadedmetadata = r);
-        video.play();
+
+        // Wait for video to be ready
+        await new Promise((resolve) => {
+            video.onloadedmetadata = () => {
+                video.play();
+                // crucial delay: wait for first frame to actually render
+                setTimeout(resolve, 500);
+            };
+        });
 
         // 6. Draw to canvas
         const canvas = document.createElement('canvas');
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         const ctx = canvas.getContext('2d');
+
+        // If it's still grey, try to draw multiple times or wait longer
         ctx.drawImage(video, 0, 0);
 
         // 7. Cleanup
         stream.getTracks().forEach(t => t.stop());
+        video.pause();
+        video.srcObject = null;
         video.remove();
 
         // 8. Result
