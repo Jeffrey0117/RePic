@@ -48,8 +48,25 @@ ipcMain.handle('show-window', () => {
 });
 
 ipcMain.handle('get-desktop-sources', async () => {
-    const sources = await desktopCapturer.getSources({ types: ['screen'] });
-    return sources; // Can't pass full objects properly sometimes, but basic info is fine
+    // Get primary display resolution for high-res thumbnail
+    const { screen } = require('electron');
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const { width, height } = primaryDisplay.size;
+
+    const sources = await desktopCapturer.getSources({
+        types: ['screen'],
+        thumbnailSize: {
+            width: width * primaryDisplay.scaleFactor,
+            height: height * primaryDisplay.scaleFactor
+        }
+    });
+
+    // We return the thumbnail as a data URL so it's ready to use in the renderer
+    return sources.map(s => ({
+        id: s.id,
+        name: s.name,
+        thumbnail: s.thumbnail.toDataURL()
+    }));
 });
 
 ipcMain.handle('select-directory', async () => {
