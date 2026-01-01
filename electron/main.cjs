@@ -25,7 +25,7 @@ function createWindow() {
     const isDev = !app.isPackaged;
 
     if (isDev) {
-        mainWindow.loadURL('http://localhost:8888');
+        mainWindow.loadURL('http://localhost:3000');
     } else {
         mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
     }
