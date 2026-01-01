@@ -147,14 +147,17 @@ function App() {
   };
 
   const handleBatchCropConfirm = async (selectedIndexes, outputMode, customDir, onProgress) => {
-    if (!batchCrop || !selectedIndexes.length) return;
+    if (!batchCrop) return;
 
     const { ipcRenderer } = window.require('electron');
     let successCount = 0;
     let failCount = 0;
 
-    for (let i = 0; i < selectedIndexes.length; i++) {
-      const filePath = files[selectedIndexes[i]];
+    // Include current image + selected images
+    const allIndexes = [currentIndex, ...selectedIndexes];
+
+    for (let i = 0; i < allIndexes.length; i++) {
+      const filePath = files[allIndexes[i]];
       onProgress(i + 1);
 
       try {

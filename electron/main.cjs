@@ -21,13 +21,13 @@ function createWindow() {
 
     Menu.setApplicationMenu(null);
 
-    const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
-    // Try multiple ports if default is busy, but for now hardcode or use arg
-    const startUrl = isDev
-        ? 'http://localhost:5173'
-        : `file://${path.join(__dirname, '../dist/index.html')}`;
+    const isDev = !app.isPackaged;
 
-    mainWindow.loadURL(startUrl);
+    if (isDev) {
+        mainWindow.loadURL('http://localhost:8888');
+    } else {
+        mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+    }
 
     // Handle port fallback manually if needed, but wait-on usually handles 5174.
     // Ideally passed via env var.

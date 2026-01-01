@@ -57,15 +57,15 @@ export const BatchCropModal = ({
     };
 
     const handleConfirm = async () => {
-        if (selectedFiles.size === 0) return;
-
         setIsProcessing(true);
         const selectedArray = Array.from(selectedFiles);
-        setProgress({ current: 0, total: selectedArray.length });
+        // +1 for current image
+        const totalWithCurrent = selectedArray.length + 1;
+        setProgress({ current: 0, total: totalWithCurrent });
 
         try {
             await onConfirm(selectedArray, outputMode, customDir, (current) => {
-                setProgress({ current, total: selectedArray.length });
+                setProgress({ current, total: totalWithCurrent });
             });
         } finally {
             setIsProcessing(false);
