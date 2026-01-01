@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { Save, Download, X, Check } from 'lucide-react';
+import { Download, X, Check } from 'lucide-react';
 import { Button } from './Button';
 
 export const SaveToolbar = ({ onSaveReplace, onSaveAs, onDiscard, isLocalFile }) => {

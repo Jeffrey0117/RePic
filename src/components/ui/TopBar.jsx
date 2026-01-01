@@ -2,13 +2,8 @@ import { motion } from 'framer-motion';
 import {
     FolderOpen,
     RotateCcw,
-    Copy,
     Scissors,
     Trash2,
-    Search,
-    LayoutGrid,
-    Settings,
-    Maximize,
     Download,
     Camera,
     Info,
@@ -17,12 +12,23 @@ import {
 import { Button } from './Button';
 import useI18n from '../../hooks/useI18n';
 
+// Check if electronAPI is available (injected via preload script)
+const electronAPI = window.electronAPI || null;
+
 export const TopBar = ({ currentPath, onOpenFolder, onScreenshot, onEdit, onClear, onSave, showInfoPanel, onToggleInfo }) => {
     const { t, language, setLanguage } = useI18n();
 
-    const folderName = currentPath
-        ? (window.require ? window.require('path').basename(currentPath) : currentPath)
-        : t('openFolder');
+    // Get folder name using electronAPI or fallback
+    const getFolderName = () => {
+        if (!currentPath) return t('openFolder');
+        if (electronAPI && electronAPI.path) {
+            return electronAPI.path.basename(currentPath);
+        }
+        // Fallback to simple string parsing
+        return currentPath.split(/[\\/]/).pop() || currentPath;
+    };
+
+    const folderName = getFolderName();
 
     const nextLang = language === 'en' ? 'zh-TW' : 'en';
     const langDisplay = language === 'en' ? 'EN' : '中';
@@ -45,13 +51,9 @@ export const TopBar = ({ currentPath, onOpenFolder, onScreenshot, onEdit, onClea
             {/* Center: Main Tools */}
             <div className="flex items-center bg-black/20 rounded-xl p-1 border border-white/5">
                 <ToolButton icon={RotateCcw} title={t('refresh')} onClick={() => window.location.reload()} />
-                <ToolButton icon={Copy} title={t('copy')} onClick={() => { }} />
                 <ToolButton icon={Scissors} title={t('editArea')} onClick={onEdit} />
                 <ToolButton icon={Trash2} title={t('delete')} className="text-danger" onClick={onClear} />
                 <div className="w-[1px] h-4 bg-white/10 mx-1"></div>
-                <ToolButton icon={Search} title={t('zoom')} />
-                <ToolButton icon={LayoutGrid} title={t('galleryView')} />
-                <ToolButton icon={Settings} title={t('settings')} />
                 <ToolButton icon={Camera} title={t('screenshot')} onClick={onScreenshot} />
             </div>
 
@@ -76,9 +78,6 @@ export const TopBar = ({ currentPath, onOpenFolder, onScreenshot, onEdit, onClea
                 </Button>
                 <Button variant="ghost" className="h-9 w-9 p-0 rounded-lg hover:bg-white/5" onClick={onSave}>
                     <Download size={18} className="text-white/70 hover:text-primary transition-colors" />
-                </Button>
-                <Button variant="ghost" className="h-9 w-9 p-0 rounded-lg hover:bg-white/5">
-                    <Maximize size={18} className="text-white/70" />
                 </Button>
             </div>
         </motion.div>

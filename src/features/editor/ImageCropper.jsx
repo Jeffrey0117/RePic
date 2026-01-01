@@ -1,36 +1,16 @@
-import { useState, useRef, useEffect } from 'react';
-import ReactCrop, { centerCrop, makeAspectCrop } from 'react-image-crop';
+import { useState, useRef } from 'react';
+import ReactCrop from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import { Button } from '../../components/ui/Button';
-import { Slider } from '../../components/ui/Slider';
 import getCroppedImg from './utils/canvasUtils';
 import { AnnotationLayer } from './AnnotationLayer';
 import { Layers } from 'lucide-react';
 import useI18n from '../../hooks/useI18n';
 
-// Helper to center the crop initially
-function centerAspectCrop(mediaWidth, mediaHeight, aspect) {
-    return centerCrop(
-        makeAspectCrop(
-            {
-                unit: '%',
-                width: 90,
-            },
-            aspect,
-            mediaWidth,
-            mediaHeight,
-        ),
-        mediaWidth,
-        mediaHeight,
-    )
-}
-
 export const ImageCropper = ({ imageSrc, onCancel, onComplete, fileCount = 1, onApplyToAll }) => {
     const { t } = useI18n();
     const [crop, setCrop] = useState();
     const [completedCrop, setCompletedCrop] = useState(null);
-    const [scale, setScale] = useState(1);
-    const [rotate, setRotate] = useState(0);
     const [activeTool, setActiveTool] = useState(null);
     const [annotations, setAnnotations] = useState([]);
     const imgRef = useRef(null);
@@ -53,8 +33,8 @@ export const ImageCropper = ({ imageSrc, onCancel, onComplete, fileCount = 1, on
                 const croppedImage = await getCroppedImg(
                     imgRef.current,
                     completedCrop,
-                    rotate,
-                    scale,
+                    0,  // rotate
+                    1,  // scale
                     annotations
                 );
                 onComplete(croppedImage);

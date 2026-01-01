@@ -1,16 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Dropzone } from './features/viewer/Dropzone';
 import { ImageViewer } from './features/viewer/ImageViewer';
-import { ImageCropper } from './features/editor/ImageCropper';
 import { Sidebar } from './components/ui/Sidebar';
 import { InfoPanel } from './components/ui/InfoPanel';
 import { TopBar } from './components/ui/TopBar';
 import { SaveToolbar } from './components/ui/SaveToolbar';
-import { BatchCropModal } from './components/ui/BatchCropModal';
 import { captureScreen } from './utils/capture';
 import { useFileSystem } from './hooks/useFileSystem';
 import useI18n from './hooks/useI18n';
+
+// Lazy load heavy components
+const ImageCropper = lazy(() => import('./features/editor/ImageCropper').then(m => ({ default: m.ImageCropper })));
+const BatchCropModal = lazy(() => import('./components/ui/BatchCropModal').then(m => ({ default: m.BatchCropModal })));
+
+// Check if electronAPI is available (injected via preload script)
+const electronAPI = window.electronAPI || null;
 
 function App() {
   const { t } = useI18n();
@@ -65,9 +70,8 @@ function App() {
   };
 
   const handleOpenFile = async () => {
-    if (window.require) {
-      const { ipcRenderer } = window.require('electron');
-      const dir = await ipcRenderer.invoke('select-directory');
+    if (electronAPI) {
+      const dir = await electronAPI.selectDirectory();
       if (dir) {
         loadFolder(dir);
       }
@@ -82,12 +86,9 @@ function App() {
 
   const handleSaveReplace = async () => {
     if (!currentImage || !localImage.startsWith('data:')) return;
+    if (!electronAPI) return;
 
-    const { ipcRenderer } = window.require('electron');
-    const result = await ipcRenderer.invoke('save-file', {
-      filePath: currentImage,
-      base64Data: localImage
-    });
+    const result = await electronAPI.saveFile(currentImage, localImage);
 
     if (result.success) {
       // Reload the image to update viewer/sidebar
@@ -101,26 +102,21 @@ function App() {
 
   const handleSaveAs = async () => {
     if (!localImage.startsWith('data:')) return;
-
-    const { ipcRenderer } = window.require('electron');
-    const path = window.require('path');
+    if (!electronAPI) return;
 
     let defaultName = `repic-${Date.now()}.png`;
     if (currentImage) {
-      const ext = path.extname(currentImage);
-      const base = path.basename(currentImage, ext);
+      const ext = electronAPI.path.extname(currentImage);
+      const base = electronAPI.path.basename(currentImage, ext);
       defaultName = `${base}-cropped${ext}`;
     }
 
-    const defaultPath = currentPath ? path.join(currentPath, defaultName) : defaultName;
+    const defaultPath = currentPath ? electronAPI.path.join(currentPath, defaultName) : defaultName;
 
-    const { canceled, filePath } = await ipcRenderer.invoke('show-save-dialog', defaultPath);
+    const { canceled, filePath } = await electronAPI.showSaveDialog(defaultPath);
 
     if (!canceled && filePath) {
-      const result = await ipcRenderer.invoke('save-file', {
-        filePath,
-        base64Data: localImage
-      });
+      const result = await electronAPI.saveFile(filePath, localImage);
 
       if (result.success) {
         setIsModified(false);
@@ -150,8 +146,8 @@ function App() {
 
   const handleBatchCropConfirm = async (selectedIndexes, outputMode, customDir, onProgress) => {
     if (!batchCrop) return;
+    if (!electronAPI) return;
 
-    const { ipcRenderer } = window.require('electron');
     let successCount = 0;
     let failCount = 0;
 
@@ -194,7 +190,7 @@ function App() {
         const base64Data = canvas.toDataURL('image/png');
 
         console.log('Sending batch-crop-save:', { filePath, outputMode, customDir });
-        const result = await ipcRenderer.invoke('batch-crop-save', {
+        const result = await electronAPI.batchCropSave({
           filePath,
           base64Data,
           outputMode,
@@ -288,13 +284,15 @@ function App() {
                 exit={{ opacity: 0, scale: 0.98 }}
                 className="absolute inset-0 z-20"
               >
-                <ImageCropper
-                  imageSrc={localImage}
-                  onCancel={() => setIsEditing(false)}
-                  onComplete={handleCropComplete}
-                  fileCount={files.length}
-                  onApplyToAll={handleApplyToAll}
-                />
+                <Suspense fallback={<div className="flex items-center justify-center h-full"><div className="text-white/60 animate-pulse">Loading editor...</div></div>}>
+                  <ImageCropper
+                    imageSrc={localImage}
+                    onCancel={() => setIsEditing(false)}
+                    onComplete={handleCropComplete}
+                    fileCount={files.length}
+                    onApplyToAll={handleApplyToAll}
+                  />
+                </Suspense>
               </motion.div>
             ) : localImage ? (
               <motion.div
@@ -345,14 +343,16 @@ function App() {
       )}
 
       {/* Batch Crop Modal */}
-      <BatchCropModal
-        isOpen={showBatchModal}
-        onClose={() => setShowBatchModal(false)}
-        files={files}
-        currentIndex={currentIndex}
-        crop={batchCrop}
-        onConfirm={handleBatchCropConfirm}
-      />
+      <Suspense fallback={null}>
+        <BatchCropModal
+          isOpen={showBatchModal}
+          onClose={() => setShowBatchModal(false)}
+          files={files}
+          currentIndex={currentIndex}
+          crop={batchCrop}
+          onConfirm={handleBatchCropConfirm}
+        />
+      </Suspense>
 
     </div>
   );

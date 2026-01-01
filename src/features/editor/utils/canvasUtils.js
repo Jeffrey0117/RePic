@@ -1,3 +1,5 @@
+import { drawAnnotation } from './drawingHelpers.js';
+
 // Adapted for react-image-crop output
 export default async function getCroppedImg(
     image,
@@ -55,53 +57,21 @@ export default async function getCroppedImg(
         image.naturalHeight,
     );
 
-    // Render Annotations
+    // Render Annotations using shared drawing helpers
     annotations.forEach(ann => {
-        ctx.strokeStyle = '#0066FF';
-        ctx.lineWidth = 3 * scaleX; // Adjust stroke for natural resolution
-        ctx.lineCap = 'round';
-
         // Convert UI coordinates to natural coordinates
-        const x = ann.x * scaleX;
-        const y = ann.y * scaleY;
-        const w = ann.width * scaleX;
-        const h = ann.height * scaleY;
+        const scaledAnnotation = {
+            ...ann,
+            x: ann.x * scaleX,
+            y: ann.y * scaleY,
+            width: ann.width * scaleX,
+            height: ann.height * scaleY
+        };
 
-        switch (ann.type) {
-            case 'rect':
-                ctx.strokeRect(x, y, w, h);
-                break;
-            case 'circle':
-                ctx.beginPath();
-                ctx.ellipse(x + w / 2, y + h / 2, Math.abs(w / 2), Math.abs(h / 2), 0, 0, Math.PI * 2);
-                ctx.stroke();
-                break;
-            case 'arrow':
-                const headlen = 15 * scaleX;
-                const tox = x + w;
-                const toy = y + h;
-                const dx = tox - x;
-                const dy = toy - y;
-                const angle = Math.atan2(dy, dx);
-                ctx.beginPath();
-                ctx.moveTo(x, y);
-                ctx.lineTo(tox, toy);
-                ctx.lineTo(tox - headlen * Math.cos(angle - Math.PI / 6), toy - headlen * Math.sin(angle - Math.PI / 6));
-                ctx.moveTo(tox, toy);
-                ctx.lineTo(tox - headlen * Math.cos(angle + Math.PI / 6), toy - headlen * Math.sin(angle + Math.PI / 6));
-                ctx.stroke();
-                break;
-            case 'blur':
-                // Simple blur implementation: draw a blurred version of the clipped area
-                ctx.save();
-                ctx.beginPath();
-                ctx.rect(x, y, w, h);
-                ctx.clip();
-                ctx.filter = 'blur(10px)';
-                ctx.drawImage(image, 0, 0, image.naturalWidth, image.naturalHeight);
-                ctx.restore();
-                break;
-        }
+        drawAnnotation(ctx, scaledAnnotation, {
+            scale: scaleX,
+            image: ann.type === 'blur' ? image : null
+        });
     });
 
     ctx.restore();

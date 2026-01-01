@@ -1,10 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 
-// Safe require for Electron
-const electron = window.require ? window.require('electron') : null;
-const fs = window.require ? window.require('fs') : null;
-const path = window.require ? window.require('path') : null;
-const os = window.require ? window.require('os') : null;
+// Check if electronAPI is available (injected via preload script)
+const electronAPI = window.electronAPI || null;
 
 export const useFileSystem = () => {
     const [files, setFiles] = useState([]);
@@ -15,9 +12,9 @@ export const useFileSystem = () => {
 
     // Initial Load - Desktop
     useEffect(() => {
-        if (!fs || !os || !path) return;
+        if (!electronAPI) return;
         try {
-            const desktopPath = path.join(os.homedir(), 'Desktop');
+            const desktopPath = electronAPI.getDesktopPath();
             loadFolder(desktopPath);
         } catch (e) {
             console.error("Failed to load desktop", e);
@@ -25,21 +22,10 @@ export const useFileSystem = () => {
     }, []);
 
     const loadFolder = useCallback((folderPath) => {
-        if (!fs || !path) return;
+        if (!electronAPI) return;
 
-        fs.readdir(folderPath, (err, dirFiles) => {
-            if (err) {
-                console.error("Failed to read dir", err);
-                return;
-            }
-
-            const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'];
-            const imageFiles = dirFiles
-                .filter(file => {
-                    const ext = path.extname(file).toLowerCase();
-                    return imageExtensions.includes(ext);
-                })
-                .map(file => path.join(folderPath, file));
+        try {
+            const imageFiles = electronAPI.getFilesInDirectory(folderPath);
 
             if (imageFiles.length > 0) {
                 setFiles(imageFiles);
@@ -60,7 +46,11 @@ export const useFileSystem = () => {
                 setFiles([]);
                 setCurrentIndex(-1);
             }
-        });
+        } catch (err) {
+            console.error("Failed to read dir", err);
+            setFiles([]);
+            setCurrentIndex(-1);
+        }
     }, [thumbCache]);
 
     const nextImage = useCallback(() => {
@@ -82,13 +72,13 @@ export const useFileSystem = () => {
     const currentImage = files[currentIndex] || null;
 
     useEffect(() => {
-        if (!currentImage || !electron) {
+        if (!currentImage || !electronAPI) {
             setCurrentMetadata(null);
             return;
         }
 
         const fetchInfo = async () => {
-            const info = await electron.ipcRenderer.invoke('get-file-info', currentImage);
+            const info = await electronAPI.getFileMetadata(currentImage);
             if (info) {
                 // Also try to get image dimensions
                 const img = new Image();

@@ -16,12 +16,7 @@ export const Button = ({
         primary: "bg-primary text-white hover:bg-blue-600",
         ghost: "bg-surface/80 backdrop-blur-md text-white hover:bg-zinc-700/80",
         danger: "bg-danger text-white hover:bg-red-600",
-        text: "bg-transparent text-primary hover:text-blue-400 p-0 active:scale-100" // simpler text button
-    };
-
-    const sizes = {
-        default: "px-5 py-2.5 text-sm",
-        icon: "p-3",
+        text: "bg-transparent text-primary hover:text-blue-400 p-0 active:scale-100"
     };
 
     return (

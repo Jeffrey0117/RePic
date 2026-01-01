@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { Camera, X, Check, Copy } from 'lucide-react';
 
+// Check if electronAPI is available (injected via preload script)
+const electronAPI = window.electronAPI || null;
+
 export const CaptureOverlay = () => {
     const [screenImage, setScreenImage] = useState(null);
     const [selection, setSelection] = useState(null);
@@ -10,13 +13,11 @@ export const CaptureOverlay = () => {
     const containerRef = useRef(null);
 
     useEffect(() => {
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-            const handleInitData = (event, dataUrl) => {
+        if (electronAPI) {
+            const cleanup = electronAPI.onInitCaptureData((dataUrl) => {
                 setScreenImage(dataUrl);
-            };
-            ipcRenderer.on('init-capture-data', handleInitData);
-            return () => ipcRenderer.removeListener('init-capture-data', handleInitData);
+            });
+            return cleanup;
         }
     }, []);
 
@@ -59,9 +60,8 @@ export const CaptureOverlay = () => {
     };
 
     const handleCancel = () => {
-        if (window.require) {
-            const { ipcRenderer } = window.require('electron');
-            ipcRenderer.invoke('close-capture-window', null);
+        if (electronAPI) {
+            electronAPI.closeCaptureWindow(null);
         }
     };
 
@@ -89,9 +89,8 @@ export const CaptureOverlay = () => {
             );
 
             const dataUrl = canvas.toDataURL('image/png');
-            if (window.require) {
-                const { ipcRenderer } = window.require('electron');
-                ipcRenderer.invoke('close-capture-window', dataUrl);
+            if (electronAPI) {
+                electronAPI.closeCaptureWindow(dataUrl);
             }
         };
         img.src = screenImage;

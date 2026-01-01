@@ -1,8 +1,9 @@
+import { memo } from 'react';
 import { motion } from 'framer-motion';
 import { Info, BarChart3, Database, Calendar } from 'lucide-react';
 import useI18n from '../../hooks/useI18n';
 
-export const InfoPanel = ({ metadata }) => {
+export const InfoPanel = memo(function InfoPanel({ metadata }) {
     const { t, language } = useI18n();
 
     if (!metadata) return null;
@@ -63,16 +64,18 @@ export const InfoPanel = ({ metadata }) => {
             </div>
         </motion.div>
     );
-};
+});
 
-const InfoItem = ({ icon, label, value }) => (
-    <div className="flex flex-col gap-1">
-        <div className="flex items-center gap-2 text-primary font-medium text-[11px] uppercase tracking-wider">
-            {icon}
-            <span>{label}</span>
+const InfoItem = memo(function InfoItem({ icon, label, value }) {
+    return (
+        <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2 text-primary font-medium text-[11px] uppercase tracking-wider">
+                {icon}
+                <span>{label}</span>
+            </div>
+            <div className="text-white text-sm font-light mt-1 pl-6 border-l border-primary/20">
+                {value}
+            </div>
         </div>
-        <div className="text-white text-sm font-light mt-1 pl-6 border-l border-primary/20">
-            {value}
-        </div>
-    </div>
-);
+    );
+});

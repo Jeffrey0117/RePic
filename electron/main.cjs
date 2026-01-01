@@ -4,6 +4,20 @@ const fs = require('fs');
 
 let mainWindow;
 
+// Input validation helpers
+function isValidPath(filePath) {
+    if (typeof filePath !== 'string') return false;
+    if (filePath.length === 0 || filePath.length > 32767) return false;
+    // Block path traversal attempts
+    if (filePath.includes('..')) return false;
+    return true;
+}
+
+function isValidBase64Data(data) {
+    if (typeof data !== 'string') return false;
+    return data.startsWith('data:image/');
+}
+
 function createWindow() {
     mainWindow = new BrowserWindow({
         width: 1000,
@@ -13,10 +27,12 @@ function createWindow() {
         backgroundColor: '#000000',
         titleBarStyle: 'hiddenInset',
         icon: path.join(__dirname, '../repic-logo.png'),
+        show: false, // Don't show until ready
         webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false,
-            webSecurity: false
+            preload: path.join(__dirname, 'preload.cjs'),
+            nodeIntegration: false,
+            contextIsolation: true,
+            webSecurity: false // Keep false for local file access (file:// protocol)
         }
     });
 
@@ -30,18 +46,22 @@ function createWindow() {
         mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
     }
 
-    // Handle port fallback manually if needed, but wait-on usually handles 5174.
-    // Ideally passed via env var.
+    // Show window when ready to avoid white flash
+    mainWindow.once('ready-to-show', () => {
+        mainWindow.show();
+    });
 }
 
 function setupIpcHandlers() {
     ipcMain.handle('hide-window', () => {
+        if (!mainWindow) return false;
         mainWindow.minimize();
         mainWindow.hide();
         return true;
     });
 
     ipcMain.handle('show-window', () => {
+        if (!mainWindow) return false;
         mainWindow.show();
         mainWindow.focus();
         return true;
@@ -68,6 +88,7 @@ function setupIpcHandlers() {
     });
 
     ipcMain.handle('select-directory', async () => {
+        if (!mainWindow) return null;
         const result = await dialog.showOpenDialog(mainWindow, {
             properties: ['openDirectory']
         });
@@ -76,6 +97,12 @@ function setupIpcHandlers() {
     });
 
     ipcMain.handle('get-file-info', async (event, filePath) => {
+        // Input validation
+        if (!isValidPath(filePath)) {
+            console.error('Invalid file path provided to get-file-info');
+            return null;
+        }
+
         try {
             const stats = fs.statSync(filePath);
             return {
@@ -90,8 +117,20 @@ function setupIpcHandlers() {
     });
 
     ipcMain.handle('save-file', async (event, { filePath, base64Data }) => {
+        // Input validation
+        if (!isValidPath(filePath)) {
+            return { success: false, error: 'Invalid file path' };
+        }
+        if (!isValidBase64Data(base64Data)) {
+            return { success: false, error: 'Invalid image data format' };
+        }
+
         try {
-            const buffer = Buffer.from(base64Data.split(',')[1], 'base64');
+            const base64Content = base64Data.split(',')[1];
+            if (!base64Content) {
+                return { success: false, error: 'Invalid base64 content' };
+            }
+            const buffer = Buffer.from(base64Content, 'base64');
             fs.writeFileSync(filePath, buffer);
             return { success: true };
         } catch (e) {
@@ -101,6 +140,13 @@ function setupIpcHandlers() {
     });
 
     ipcMain.handle('show-save-dialog', async (event, defaultPath) => {
+        if (!mainWindow) return { canceled: true };
+
+        // Basic validation for defaultPath
+        if (defaultPath && typeof defaultPath !== 'string') {
+            defaultPath = undefined;
+        }
+
         const result = await dialog.showSaveDialog(mainWindow, {
             defaultPath,
             filters: [
@@ -113,6 +159,24 @@ function setupIpcHandlers() {
     // Batch crop - save cropped image data to file
     ipcMain.handle('batch-crop-save', async (event, { filePath, base64Data, outputMode, originalPath, customDir }) => {
         console.log('[batch-crop-save] Received:', { filePath, outputMode, originalPath, customDir, hasBase64: !!base64Data });
+
+        // Input validation
+        if (!isValidPath(filePath)) {
+            return { success: false, error: 'Invalid file path' };
+        }
+        if (!isValidBase64Data(base64Data)) {
+            return { success: false, error: 'Invalid image data format' };
+        }
+        if (originalPath && !isValidPath(originalPath)) {
+            return { success: false, error: 'Invalid original path' };
+        }
+        if (customDir && !isValidPath(customDir)) {
+            return { success: false, error: 'Invalid custom directory' };
+        }
+        if (!['replace', 'folder', 'custom'].includes(outputMode)) {
+            return { success: false, error: 'Invalid output mode' };
+        }
+
         try {
             let targetPath = filePath;
 
@@ -121,19 +185,23 @@ function setupIpcHandlers() {
                 if (!fs.existsSync(customDir)) {
                     fs.mkdirSync(customDir, { recursive: true });
                 }
-                targetPath = path.join(customDir, path.basename(originalPath));
+                targetPath = path.join(customDir, path.basename(originalPath || filePath));
             } else if (outputMode === 'folder') {
                 // Create "cropped" subfolder
-                const dir = path.dirname(originalPath);
+                const dir = path.dirname(originalPath || filePath);
                 const croppedDir = path.join(dir, 'cropped');
                 if (!fs.existsSync(croppedDir)) {
                     fs.mkdirSync(croppedDir, { recursive: true });
                 }
-                targetPath = path.join(croppedDir, path.basename(originalPath));
+                targetPath = path.join(croppedDir, path.basename(originalPath || filePath));
             }
 
             console.log('[batch-crop-save] Writing to:', targetPath);
-            const buffer = Buffer.from(base64Data.split(',')[1], 'base64');
+            const base64Content = base64Data.split(',')[1];
+            if (!base64Content) {
+                return { success: false, error: 'Invalid base64 content' };
+            }
+            const buffer = Buffer.from(base64Content, 'base64');
             fs.writeFileSync(targetPath, buffer);
             console.log('[batch-crop-save] Success!');
             return { success: true, path: targetPath };

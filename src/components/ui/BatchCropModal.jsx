@@ -4,6 +4,9 @@ import { X, FolderOutput, Replace, Loader2, Check, FolderOpen } from 'lucide-rea
 import { Button } from './Button';
 import useI18n from '../../hooks/useI18n';
 
+// Check if electronAPI is available (injected via preload script)
+const electronAPI = window.electronAPI || null;
+
 export const BatchCropModal = ({
     isOpen,
     onClose,
@@ -30,9 +33,8 @@ export const BatchCropModal = ({
     }, [isOpen]);
 
     const handleSelectDirectory = async () => {
-        if (!window.require) return;
-        const { ipcRenderer } = window.require('electron');
-        const dir = await ipcRenderer.invoke('select-directory');
+        if (!electronAPI) return;
+        const dir = await electronAPI.selectDirectory();
         if (dir) {
             setCustomDir(dir);
             setOutputMode('custom');
@@ -77,7 +79,14 @@ export const BatchCropModal = ({
 
     if (!isOpen) return null;
 
-    const path = window.require ? window.require('path') : null;
+    // Use electronAPI.path for basename if available
+    const getBasename = (filePath) => {
+        if (electronAPI && electronAPI.path) {
+            return electronAPI.path.basename(filePath);
+        }
+        // Fallback to simple string parsing
+        return filePath.split(/[\\/]/).pop() || filePath;
+    };
 
     return (
         <AnimatePresence>
@@ -149,7 +158,7 @@ export const BatchCropModal = ({
                                 {files.map((filePath, index) => {
                                     const isCurrentImage = index === currentIndex;
                                     const isSelected = selectedFiles.has(index);
-                                    const fileName = path ? path.basename(filePath) : filePath;
+                                    const fileName = getBasename(filePath);
 
                                     return (
                                         <button
@@ -253,7 +262,7 @@ export const BatchCropModal = ({
                             >
                                 <FolderOpen size={16} className={outputMode === 'custom' ? 'text-primary' : 'text-white/40'} />
                                 <span className="text-sm text-white">
-                                    {customDir ? t('saveTo', { folder: path?.basename(customDir) }) : t('selectDirectory')}
+                                    {customDir ? t('saveTo', { folder: getBasename(customDir) }) : t('selectDirectory')}
                                 </span>
                             </button>
                         </div>

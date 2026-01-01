@@ -1,4 +1,5 @@
-import React, { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useState } from 'react';
+import { drawAnnotation } from './utils/drawingHelpers.js';
 
 export const AnnotationLayer = ({ activeTool, onDrawEnd, imageRef }) => {
     const canvasRef = useRef(null);
@@ -30,47 +31,6 @@ export const AnnotationLayer = ({ activeTool, onDrawEnd, imageRef }) => {
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         annotations.forEach(ann => drawAnnotation(ctx, ann));
-    };
-
-    const drawAnnotation = (ctx, ann) => {
-        ctx.strokeStyle = '#0066FF';
-        ctx.lineWidth = 3;
-        ctx.lineCap = 'round';
-
-        switch (ann.type) {
-            case 'rect':
-                ctx.strokeRect(ann.x, ann.y, ann.width, ann.height);
-                break;
-            case 'circle':
-                ctx.beginPath();
-                ctx.ellipse(ann.x + ann.width / 2, ann.y + ann.height / 2, Math.abs(ann.width / 2), Math.abs(ann.height / 2), 0, 0, Math.PI * 2);
-                ctx.stroke();
-                break;
-            case 'arrow':
-                drawArrow(ctx, ann.x, ann.y, ann.x + ann.width, ann.y + ann.height);
-                break;
-            case 'blur':
-                // For MVP, we just draw a semi-transparent box for blur representation
-                ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
-                ctx.fillRect(ann.x, ann.y, ann.width, ann.height);
-                ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-                ctx.strokeRect(ann.x, ann.y, ann.width, ann.height);
-                break;
-        }
-    };
-
-    const drawArrow = (ctx, fromx, fromy, tox, toy) => {
-        const headlen = 15;
-        const dx = tox - fromx;
-        const dy = toy - fromy;
-        const angle = Math.atan2(dy, dx);
-        ctx.beginPath();
-        ctx.moveTo(fromx, fromy);
-        ctx.lineTo(tox, toy);
-        ctx.lineTo(tox - headlen * Math.cos(angle - Math.PI / 6), toy - headlen * Math.sin(angle - Math.PI / 6));
-        ctx.moveTo(tox, toy);
-        ctx.lineTo(tox - headlen * Math.cos(angle + Math.PI / 6), toy - headlen * Math.sin(angle + Math.PI / 6));
-        ctx.stroke();
     };
 
     const handleMouseDown = (e) => {
