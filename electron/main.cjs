@@ -33,86 +33,85 @@ function createWindow() {
     // Ideally passed via env var.
 }
 
-ipcMain.handle('hide-window', () => {
-    mainWindow.minimize(); // or hide()
-    // mainWindow.hide() is better for screenshot so it completely disappears.
-    // But minimize works too. Let's use hide to be instant.
-    mainWindow.hide();
-    return true;
-});
+function setupIpcHandlers() {
+    ipcMain.handle('hide-window', () => {
+        mainWindow.minimize();
+        mainWindow.hide();
+        return true;
+    });
 
-ipcMain.handle('show-window', () => {
-    mainWindow.show();
-    mainWindow.focus();
-    return true;
-});
+    ipcMain.handle('show-window', () => {
+        mainWindow.show();
+        mainWindow.focus();
+        return true;
+    });
 
-ipcMain.handle('get-desktop-sources', async () => {
-    // Get primary display resolution for high-res thumbnail
-    const { screen } = require('electron');
-    const primaryDisplay = screen.getPrimaryDisplay();
-    const { width, height } = primaryDisplay.size;
+    ipcMain.handle('get-desktop-sources', async () => {
+        const { screen } = require('electron');
+        const primaryDisplay = screen.getPrimaryDisplay();
+        const { width, height } = primaryDisplay.size;
 
-    const sources = await desktopCapturer.getSources({
-        types: ['screen'],
-        thumbnailSize: {
-            width: width * primaryDisplay.scaleFactor,
-            height: height * primaryDisplay.scaleFactor
+        const sources = await desktopCapturer.getSources({
+            types: ['screen'],
+            thumbnailSize: {
+                width: width * primaryDisplay.scaleFactor,
+                height: height * primaryDisplay.scaleFactor
+            }
+        });
+
+        return sources.map(s => ({
+            id: s.id,
+            name: s.name,
+            thumbnail: s.thumbnail.toDataURL()
+        }));
+    });
+
+    ipcMain.handle('select-directory', async () => {
+        const result = await dialog.showOpenDialog(mainWindow, {
+            properties: ['openDirectory']
+        });
+        if (result.canceled) return null;
+        return result.filePaths[0];
+    });
+
+    ipcMain.handle('get-file-info', async (event, filePath) => {
+        try {
+            const stats = fs.statSync(filePath);
+            return {
+                size: stats.size,
+                birthtime: stats.birthtime,
+                mtime: stats.mtime
+            };
+        } catch (e) {
+            console.error("Failed to get file info", e);
+            return null;
         }
     });
 
-    // We return the thumbnail as a data URL so it's ready to use in the renderer
-    return sources.map(s => ({
-        id: s.id,
-        name: s.name,
-        thumbnail: s.thumbnail.toDataURL()
-    }));
-});
-
-ipcMain.handle('select-directory', async () => {
-    const result = await dialog.showOpenDialog(mainWindow, {
-        properties: ['openDirectory']
+    ipcMain.handle('save-file', async (event, { filePath, base64Data }) => {
+        try {
+            const buffer = Buffer.from(base64Data.split(',')[1], 'base64');
+            fs.writeFileSync(filePath, buffer);
+            return { success: true };
+        } catch (e) {
+            console.error("Failed to save file", e);
+            return { success: false, error: e.message };
+        }
     });
-    if (result.canceled) return null;
-    return result.filePaths[0];
-});
 
-ipcMain.handle('get-file-info', async (event, filePath) => {
-    try {
-        const stats = fs.statSync(filePath);
-        return {
-            size: stats.size,
-            birthtime: stats.birthtime,
-            mtime: stats.mtime
-        };
-    } catch (e) {
-        console.error("Failed to get file info", e);
-        return null;
-    }
-});
-
-ipcMain.handle('save-file', async (event, { filePath, base64Data }) => {
-    try {
-        const buffer = Buffer.from(base64Data.split(',')[1], 'base64');
-        fs.writeFileSync(filePath, buffer);
-        return { success: true };
-    } catch (e) {
-        console.error("Failed to save file", e);
-        return { success: false, error: e.message };
-    }
-});
-
-ipcMain.handle('show-save-dialog', async (event, defaultPath) => {
-    const result = await dialog.showSaveDialog(mainWindow, {
-        defaultPath,
-        filters: [
-            { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp'] }
-        ]
+    ipcMain.handle('show-save-dialog', async (event, defaultPath) => {
+        const result = await dialog.showSaveDialog(mainWindow, {
+            defaultPath,
+            filters: [
+                { name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp'] }
+            ]
+        });
+        return result;
     });
-    return result;
-});
+}
 
 app.whenReady().then(() => {
+    setupIpcHandlers();
     createWindow();
 
     app.on('activate', () => {

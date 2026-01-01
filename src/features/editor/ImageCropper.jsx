@@ -4,6 +4,7 @@ import 'react-image-crop/dist/ReactCrop.css';
 import { Button } from '../../components/ui/Button';
 import { Slider } from '../../components/ui/Slider';
 import getCroppedImg from './utils/canvasUtils';
+import { AnnotationLayer } from './AnnotationLayer';
 
 // Helper to center the crop initially
 function centerAspectCrop(mediaWidth, mediaHeight, aspect) {
@@ -67,11 +68,11 @@ export const ImageCropper = ({ imageSrc, onCancel, onComplete }) => {
     };
 
     const tools = [
+        { id: null, label: 'Crop', icon: 'Crop' },  // null = crop mode
         { id: 'rect', label: 'Box', icon: 'Square' },
         { id: 'circle', label: 'Circle', icon: 'Circle' },
         { id: 'arrow', label: 'Arrow', icon: 'ArrowUpRight' },
         { id: 'blur', label: 'Blur', icon: 'Ghost' },
-        { id: 'text', label: 'Text', icon: 'Type' },
     ];
 
     return (
@@ -100,7 +101,7 @@ export const ImageCropper = ({ imageSrc, onCancel, onComplete }) => {
                         />
                     </ReactCrop>
 
-                    {imgRef.current && (
+                    {imgRef.current && activeTool && (
                         <AnnotationLayer
                             activeTool={activeTool}
                             onDrawEnd={setAnnotations}
@@ -113,12 +114,12 @@ export const ImageCropper = ({ imageSrc, onCancel, onComplete }) => {
             {/* Controls Toolbar */}
             <div className="bg-surface/90 backdrop-blur-md pb-safe-area-bottom px-8 py-4 space-y-4 shadow-glass w-full border-t border-white/10 z-20">
 
-                {/* Annotation Tools */}
-                <div className="flex justify-center gap-4 border-b border-white/5 pb-4">
+                {/* Mode Tools */}
+                <div className="flex justify-center gap-2 border-b border-white/5 pb-4">
                     {tools.map(tool => (
                         <button
-                            key={tool.id}
-                            onClick={() => setActiveTool(activeTool === tool.id ? null : tool.id)}
+                            key={tool.id ?? 'crop'}
+                            onClick={() => setActiveTool(tool.id)}
                             className={`px-3 py-1.5 rounded-lg text-xs transition-all ${activeTool === tool.id ? 'bg-primary text-white' : 'bg-white/5 text-white/60 hover:bg-white/10'}`}
                         >
                             {tool.label}
@@ -131,7 +132,7 @@ export const ImageCropper = ({ imageSrc, onCancel, onComplete }) => {
                         Cancel
                     </Button>
                     <span className="text-sm font-semibold text-white tracking-wide">
-                        {activeTool ? `Drawing ${activeTool}` : 'Adjust & Annotate'}
+                        {activeTool ? `Draw ${activeTool}` : 'Crop Mode'}
                     </span>
                     <Button variant="text" onClick={handleSave} className="text-primary hover:text-blue-400 font-bold">
                         Done
