@@ -50,5 +50,7 @@
   "fileSize": "檔案大小",
   "createdDate": "建立日期",
   "modifiedDate": "修改日期",
-  "unknown": "未知"
+  "unknown": "未知",
+  "zoomLevel": "縮放: {level}%",
+  "resetZoom": "重設縮放"
 }

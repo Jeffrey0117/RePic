@@ -9,11 +9,14 @@ import { t as translate, getLanguage, setLanguage as setLang, subscribe } from '
  */
 function useI18n() {
   const [language, setLanguageState] = useState(getLanguage);
+  // Force re-render counter to ensure all components update when language changes
+  const [, forceUpdate] = useState(0);
 
   useEffect(() => {
     // Subscribe to language changes from other components or direct API calls
     const unsubscribe = subscribe((newLang) => {
       setLanguageState(newLang);
+      forceUpdate(n => n + 1); // Force re-render all subscribed components
     });
 
     return unsubscribe;
@@ -25,7 +28,7 @@ function useI18n() {
    */
   const setLanguage = useCallback((lang) => {
     setLang(lang);
-    setLanguageState(lang);
+    // State updates are handled by the subscribe callback
   }, []);
 
   /**

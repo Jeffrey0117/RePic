@@ -50,5 +50,7 @@
   "fileSize": "File Size",
   "createdDate": "Created Date",
   "modifiedDate": "Modified Date",
-  "unknown": "Unknown"
+  "unknown": "Unknown",
+  "zoomLevel": "Zoom: {level}%",
+  "resetZoom": "Reset Zoom"
 }
