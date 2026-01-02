@@ -7,7 +7,6 @@ import { InfoPanel } from './components/ui/InfoPanel';
 import { TopBar } from './components/ui/TopBar';
 import { SaveToolbar } from './components/ui/SaveToolbar';
 import { Toast } from './components/ui/Toast';
-import { captureScreen } from './utils/capture';
 import { useFileSystem } from './hooks/useFileSystem';
 import useI18n from './hooks/useI18n';
 
@@ -36,7 +35,6 @@ function App() {
   // Local state for edits/UI
   const [localImage, setLocalImage] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [isCapturing, setIsCapturing] = useState(false);
   const [showInfoPanel, setShowInfoPanel] = useState(true);
   const [isModified, setIsModified] = useState(false);
 
@@ -62,16 +60,6 @@ function App() {
   const handleImageUpload = (imgSrc) => {
     setLocalImage(imgSrc);
     setIsEditing(false);
-  };
-
-  const handleScreenshot = async () => {
-    setIsCapturing(true);
-    const screenshot = await captureScreen();
-    if (screenshot) {
-      setLocalImage(screenshot);
-      setIsEditing(true);
-    }
-    setIsCapturing(false);
   };
 
   const handleOpenFile = async () => {
@@ -311,7 +299,6 @@ function App() {
       <TopBar
         currentPath={currentPath}
         onOpenFolder={handleOpenFile}
-        onScreenshot={handleScreenshot}
         onEdit={() => setIsEditing(true)}
         onClear={handleClear}
         onSave={handleSave}
@@ -402,13 +389,6 @@ function App() {
           />
         )}
       </AnimatePresence>
-
-      {/* Capture Overlay */}
-      {isCapturing && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-100 flex items-center justify-center">
-          <div className="text-xl font-light tracking-[0.5em] animate-pulse">{t("capturing")}</div>
-        </div>
-      )}
 
       {/* Toast Notification */}
       <AnimatePresence>

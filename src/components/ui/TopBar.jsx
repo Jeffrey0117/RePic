@@ -5,7 +5,6 @@ import {
     Scissors,
     Trash2,
     Download,
-    Camera,
     Info,
     Globe,
     Sun,
@@ -18,7 +17,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 // Check if electronAPI is available (injected via preload script)
 const electronAPI = window.electronAPI || null;
 
-export const TopBar = ({ currentPath, onOpenFolder, onScreenshot, onEdit, onClear, onSave, showInfoPanel, onToggleInfo }) => {
+export const TopBar = ({ currentPath, onOpenFolder, onEdit, onClear, onSave, showInfoPanel, onToggleInfo }) => {
     const { t, language, setLanguage } = useI18n();
     const { theme, toggleTheme } = useTheme();
 
@@ -57,8 +56,6 @@ export const TopBar = ({ currentPath, onOpenFolder, onScreenshot, onEdit, onClea
                 <ToolButton icon={RotateCcw} title={t('refresh')} onClick={() => window.location.reload()} />
                 <ToolButton icon={Scissors} title={t('editArea')} onClick={onEdit} />
                 <ToolButton icon={Trash2} title={t('delete')} className="text-danger" onClick={onClear} />
-                <div className="w-[1px] h-4 bg-white/10 mx-1"></div>
-                <ToolButton icon={Camera} title={t('screenshot')} onClick={onScreenshot} />
             </div>
 
             {/* Right: Actions */}
