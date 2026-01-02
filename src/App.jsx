@@ -319,8 +319,13 @@ function App() {
         onToggleInfo={() => setShowInfoPanel(!showInfoPanel)}
       />
 
-      {/* 2. Main Content Area */}
-      <div className="flex-1 flex overflow-hidden">
+      {/* 2. Main Content Area - using CSS Grid for smooth InfoPanel toggle */}
+      <div
+        className="flex-1 overflow-hidden grid transition-all duration-300 ease-out"
+        style={{
+          gridTemplateColumns: `auto 1fr ${showInfoPanel && !isEditing ? '280px' : '0px'}`
+        }}
+      >
 
         {/* Left: Thumbnail Explorer */}
         <Sidebar
@@ -331,7 +336,7 @@ function App() {
         />
 
         {/* Center: Main Viewport */}
-        <main className="flex-1 min-w-0 relative flex items-center justify-center p-4 main-viewport-bg transition-all duration-300 ease-out">
+        <main className="min-w-0 relative flex items-center justify-center p-4 main-viewport-bg">
           <AnimatePresence mode="wait">
             {localImage && !isEditing ? (
               <motion.div
@@ -341,7 +346,7 @@ function App() {
                 exit={{ opacity: 0 }}
                 className="w-full h-full flex items-center justify-center"
               >
-                <ImageViewer src={localImage} showInfoPanel={showInfoPanel} />
+                <ImageViewer src={localImage} />
               </motion.div>
             ) : !localImage ? (
               <motion.div
@@ -384,11 +389,10 @@ function App() {
         </main>
 
         {/* Right: Info Panel - hidden during editing */}
-        <AnimatePresence>
-          {showInfoPanel && !isEditing && (
-            <InfoPanel metadata={currentMetadata} />
-          )}
-        </AnimatePresence>
+        <InfoPanel
+          metadata={currentMetadata}
+          isVisible={showInfoPanel && !isEditing}
+        />
 
       </div>
 

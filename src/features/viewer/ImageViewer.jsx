@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from '../../lib/motion';
 import useI18n from '../../hooks/useI18n';
 
-export const ImageViewer = ({ src, showInfoPanel = true }) => {
+export const ImageViewer = ({ src }) => {
     const { t } = useI18n();
     const containerRef = useRef(null);
     const imageRef = useRef(null);
@@ -11,12 +11,6 @@ export const ImageViewer = ({ src, showInfoPanel = true }) => {
     const [position, setPosition] = useState({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
-
-    // Calculate max width based on sidebar (~150px) + InfoPanel (280px if shown) + margins
-    const sidebarWidth = 150;
-    const infoPanelWidth = showInfoPanel ? 280 : 0;
-    const margins = 80;
-    const maxImageWidth = `calc(100vw - ${sidebarWidth + infoPanelWidth + margins}px)`;
 
     // Reset zoom and position when image changes
     useEffect(() => {
@@ -119,12 +113,12 @@ export const ImageViewer = ({ src, showInfoPanel = true }) => {
         <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="w-full h-full relative flex items-center justify-center overflow-hidden transition-all duration-300 ease-out"
+            className="w-full h-full flex items-center justify-center overflow-hidden transition-all duration-300 ease-out"
         >
             {/* Zoom percentage indicator */}
             {scale !== 1 && (
                 <div
-                    className="absolute top-8 left-8 z-10 bg-black/60 backdrop-blur-md text-white text-xs px-3 py-1.5 rounded-full font-mono tracking-wide shadow-lg border border-white/10 cursor-pointer hover:bg-black/80 transition-colors"
+                    className="fixed top-20 left-44 z-10 bg-black/60 backdrop-blur-md text-white text-xs px-3 py-1.5 rounded-full font-mono tracking-wide shadow-lg border border-white/10 cursor-pointer hover:bg-black/80 transition-colors"
                     onClick={handleDoubleClick}
                     title={t('resetZoom')}
                 >
@@ -136,7 +130,7 @@ export const ImageViewer = ({ src, showInfoPanel = true }) => {
                 ref={containerRef}
                 onDoubleClick={handleDoubleClick}
                 onMouseDown={handleMouseDown}
-                className="relative group shadow-[0_0_50px_rgba(0,0,0,0.5)] rounded-lg overflow-hidden border border-white/5 transition-all duration-300 ease-out"
+                className="group shadow-[0_0_50px_rgba(0,0,0,0.5)] rounded-lg overflow-hidden border border-white/5 transition-all duration-300 ease-out"
                 style={{ cursor: getCursor() }}
             >
                 <img
@@ -145,11 +139,11 @@ export const ImageViewer = ({ src, showInfoPanel = true }) => {
                     alt="View"
                     className="block select-none"
                     style={{
-                        maxWidth: maxImageWidth,
+                        maxWidth: '100%',
                         maxHeight: 'calc(100vh - 180px)',
                         objectFit: 'contain',
                         transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
-                        transition: isDragging ? 'none' : 'transform 0.1s ease-out, max-width 0.3s ease-out, max-height 0.3s ease-out'
+                        transition: isDragging ? 'none' : 'transform 0.1s ease-out'
                     }}
                     draggable={false}
                 />
