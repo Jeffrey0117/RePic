@@ -383,12 +383,11 @@ function App() {
           </AnimatePresence>
         </main>
 
-        {/* Right: Info Panel - hidden during editing */}
-        <AnimatePresence>
-          {showInfoPanel && !isEditing && (
-            <InfoPanel metadata={currentMetadata} />
-          )}
-        </AnimatePresence>
+        {/* Right: Info Panel - always in DOM, controlled by CSS width transition */}
+        <InfoPanel
+          metadata={currentMetadata}
+          isVisible={showInfoPanel && !isEditing}
+        />
 
       </div>
 
