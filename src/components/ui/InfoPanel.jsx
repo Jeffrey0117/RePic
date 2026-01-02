@@ -20,10 +20,11 @@ export const InfoPanel = memo(function InfoPanel({ metadata }) {
     };
 
     return (
-        <motion.div
-            initial={{ x: 300, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: 300, opacity: 0 }}
+        <motion.aside
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
             className="w-[280px] h-full bg-surface/30 backdrop-blur-xl border-l border-white/5 flex flex-col overflow-hidden p-6 shrink-0"
         >
             {metadata ? (
@@ -69,7 +70,7 @@ export const InfoPanel = memo(function InfoPanel({ metadata }) {
                     {t('noImageSelected') || 'No image selected'}
                 </div>
             )}
-        </motion.div>
+        </motion.aside>
     );
 });
 
