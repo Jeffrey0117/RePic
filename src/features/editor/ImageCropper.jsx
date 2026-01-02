@@ -86,9 +86,9 @@ export const ImageCropper = ({ imageSrc, onCancel, onComplete, fileCount = 1, on
                             src={imageSrc}
                             alt="Crop me"
                             onLoad={onImageLoad}
+                            className="max-w-full"
                             style={{
                                 maxHeight: 'calc(100vh - 200px)',
-                                maxWidth: 'calc(100vw - 450px)',
                                 display: 'block'
                             }}
                         />

@@ -68,10 +68,13 @@ export const Sidebar = ({ files, currentIndex, onSelect, cacheVersion = 0 }) => 
                                 {index + 1}
                             </div>
 
-                            <div className={`
-                w-16 h-16 rounded-lg overflow-hidden border-2 transition-all duration-200 shadow-lg bg-black/50
-                ${isActive ? 'border-primary ring-2 ring-primary/20 scale-105' : 'border-transparent group-hover:border-white/30'}
-              `}>
+                            <div
+                                className={`
+                                    rounded-lg overflow-hidden border-2 transition-all duration-200 shadow-lg bg-black/50
+                                    ${isActive ? 'border-primary ring-2 ring-primary/20 scale-105' : 'border-transparent group-hover:border-white/30'}
+                                `}
+                                style={{ width: `${width - 24}px`, height: `${width - 24}px` }}
+                            >
                                 <img
                                     src={`file://${file}?v=${cacheVersion}`}
                                     alt=""
