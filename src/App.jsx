@@ -14,8 +14,8 @@ import useI18n from './hooks/useI18n';
 const ImageCropper = lazy(() => import('./features/editor/ImageCropper').then(m => ({ default: m.ImageCropper })));
 const BatchCropModal = lazy(() => import('./components/ui/BatchCropModal').then(m => ({ default: m.BatchCropModal })));
 
-// Check if electronAPI is available (injected via preload script)
-const electronAPI = window.electronAPI || null;
+// Dynamic getter for electronAPI (injected via preload script)
+const getElectronAPI = () => window.electronAPI || null;
 
 function App() {
   const { t } = useI18n();
@@ -70,6 +70,7 @@ function App() {
   };
 
   const handleOpenFile = async () => {
+    const electronAPI = getElectronAPI();
     if (electronAPI) {
       const dir = await electronAPI.selectDirectory();
       if (dir) {
@@ -85,6 +86,7 @@ function App() {
   };
 
   const handleSaveReplace = async () => {
+    const electronAPI = getElectronAPI();
     if (!currentImage || !localImage.startsWith('data:')) return;
     if (!electronAPI) return;
 
@@ -101,6 +103,7 @@ function App() {
   };
 
   const handleSaveAs = async () => {
+    const electronAPI = getElectronAPI();
     if (!localImage.startsWith('data:')) return;
     if (!electronAPI) return;
 
@@ -145,6 +148,7 @@ function App() {
   };
 
   const handleBatchCropConfirm = async (selectedIndexes, outputMode, customDir, onProgress) => {
+    const electronAPI = getElectronAPI();
     if (!batchCrop) return;
     if (!electronAPI) return;
 
@@ -305,7 +309,7 @@ function App() {
               </motion.div>
             ) : (
               <div className="w-full h-full flex flex-col items-center justify-center opacity-40">
-                <Dropzone onImageUpload={handleImageUpload} />
+                <Dropzone onImageUpload={handleImageUpload} onOpenFolder={handleOpenFile} />
                 <div className="mt-8 text-sm tracking-widest uppercase animate-pulse">
                   {t("selectFolder")}
                 </div>

@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 
-// Check if electronAPI is available (injected via preload script)
-const electronAPI = window.electronAPI || null;
+// Dynamic getter for electronAPI (injected via preload script)
+// Must be called at runtime, not at module load time
+const getElectronAPI = () => window.electronAPI || null;
 
 export const useFileSystem = () => {
     const [files, setFiles] = useState([]);
@@ -10,18 +11,33 @@ export const useFileSystem = () => {
     const [currentMetadata, setCurrentMetadata] = useState(null);
     const [thumbCache, setThumbCache] = useState({}); // Simple memory cache
 
-    // Initial Load - Desktop
+    // Initial Load - Desktop with retry mechanism
     useEffect(() => {
-        if (!electronAPI) return;
-        try {
-            const desktopPath = electronAPI.getDesktopPath();
-            loadFolder(desktopPath);
-        } catch (e) {
-            console.error("Failed to load desktop", e);
-        }
+        let attempts = 0;
+        const maxAttempts = 20; // Try for 2 seconds max
+
+        const tryLoadDesktop = () => {
+            const electronAPI = getElectronAPI();
+            if (electronAPI) {
+                try {
+                    const desktopPath = electronAPI.getDesktopPath();
+                    loadFolder(desktopPath);
+                } catch (e) {
+                    console.error("Failed to load desktop", e);
+                }
+            } else if (attempts < maxAttempts) {
+                attempts++;
+                setTimeout(tryLoadDesktop, 100);
+            } else {
+                console.warn('electronAPI not available after retries');
+            }
+        };
+
+        tryLoadDesktop();
     }, []);
 
     const loadFolder = useCallback((folderPath) => {
+        const electronAPI = getElectronAPI();
         if (!electronAPI) return;
 
         try {
@@ -45,6 +61,7 @@ export const useFileSystem = () => {
             } else {
                 setFiles([]);
                 setCurrentIndex(-1);
+                setCurrentPath(folderPath);
             }
         } catch (err) {
             console.error("Failed to read dir", err);
@@ -72,6 +89,7 @@ export const useFileSystem = () => {
     const currentImage = files[currentIndex] || null;
 
     useEffect(() => {
+        const electronAPI = getElectronAPI();
         if (!currentImage || !electronAPI) {
             setCurrentMetadata(null);
             return;

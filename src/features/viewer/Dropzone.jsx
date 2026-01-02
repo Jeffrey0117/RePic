@@ -1,10 +1,12 @@
 import { useState, useCallback } from 'react';
-import { Upload, Image as ImageIcon } from 'lucide-react';
+import { Upload, Image as ImageIcon, FolderOpen } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import clsx from 'clsx';
 import { Button } from '../../components/ui/Button';
+import useI18n from '../../hooks/useI18n';
 
-export const Dropzone = ({ onImageUpload }) => {
+export const Dropzone = ({ onImageUpload, onOpenFolder }) => {
+    const { t } = useI18n();
     const [isDragActive, setIsDragActive] = useState(false);
 
     const handleDrag = useCallback((e) => {
@@ -78,7 +80,17 @@ export const Dropzone = ({ onImageUpload }) => {
                         </div>
                     </div>
 
-                    <div className="mt-8">
+                    <div className="mt-8 flex flex-col gap-3">
+                        {onOpenFolder && (
+                            <Button
+                                variant="primary"
+                                icon={FolderOpen}
+                                className="pointer-events-auto w-full justify-center"
+                                onClick={onOpenFolder}
+                            >
+                                {t('openFolder')}
+                            </Button>
+                        )}
                         <input
                             type="file"
                             accept="image/*"
@@ -87,8 +99,8 @@ export const Dropzone = ({ onImageUpload }) => {
                             onChange={handleFileInput}
                         />
                         <label htmlFor="file-upload">
-                            <Button variant="primary" icon={Upload} className="pointer-events-auto w-full justify-center">
-                                Select Image
+                            <Button variant="secondary" icon={Upload} className="pointer-events-auto w-full justify-center">
+                                {t('openImage')}
                             </Button>
                         </label>
                     </div>
