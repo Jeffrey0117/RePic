@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { motion } from '../../lib/motion';
 import useI18n from '../../hooks/useI18n';
 
 export const ImageViewer = ({ src }) => {
@@ -110,13 +109,11 @@ export const ImageViewer = ({ src }) => {
     };
 
     return (
-        <motion.div
+        <div
             ref={containerRef}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
             onDoubleClick={handleDoubleClick}
             onMouseDown={handleMouseDown}
-            className="w-full h-full flex items-center justify-center overflow-hidden"
+            className="w-full h-full flex items-center justify-center overflow-hidden relative"
             style={{ cursor: getCursor() }}
         >
             {/* Zoom percentage indicator */}
@@ -151,6 +148,6 @@ export const ImageViewer = ({ src }) => {
                 }}
                 draggable={false}
             />
-        </motion.div>
+        </div>
     );
 };
