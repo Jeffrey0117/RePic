@@ -130,18 +130,20 @@ export const ImageViewer = ({ src }) => {
                 ref={containerRef}
                 onDoubleClick={handleDoubleClick}
                 onMouseDown={handleMouseDown}
-                className="relative group shadow-[0_0_50px_rgba(0,0,0,0.5)] rounded-lg overflow-hidden border border-white/5 max-w-[calc(100%-32px)] max-h-[calc(100%-32px)] transition-all duration-300 ease-out"
+                className="relative group shadow-[0_0_50px_rgba(0,0,0,0.5)] rounded-lg overflow-hidden border border-white/5 transition-all duration-300 ease-out"
                 style={{ cursor: getCursor() }}
             >
                 <img
                     ref={imageRef}
                     src={src}
                     alt="View"
-                    className="block select-none max-w-full max-h-[calc(100vh-180px)]"
+                    className="block select-none transition-all duration-300 ease-out"
                     style={{
+                        maxWidth: 'calc(100vw - 500px)',
+                        maxHeight: 'calc(100vh - 180px)',
                         objectFit: 'contain',
                         transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
-                        transition: isDragging ? 'none' : 'transform 0.1s ease-out'
+                        transition: isDragging ? 'none' : 'transform 0.1s ease-out, max-width 0.3s ease-out'
                     }}
                     draggable={false}
                 />

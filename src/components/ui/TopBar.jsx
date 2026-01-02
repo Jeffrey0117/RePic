@@ -65,7 +65,7 @@ export const TopBar = ({ currentPath, onOpenFolder, onScreenshot, onEdit, onClea
             <div className="flex items-center gap-2">
                 <Button
                     variant="ghost"
-                    className="h-9 w-9 p-0 rounded-lg hover:bg-white/5 text-white/70"
+                    className={`h-9 w-9 p-0 rounded-lg hover:bg-black/10 dark:hover:bg-white/5 ${theme === 'dark' ? 'text-white/70' : 'text-gray-600'}`}
                     onClick={toggleTheme}
                     title={theme === 'dark' ? t('lightMode') : t('darkMode')}
                 >
@@ -73,7 +73,7 @@ export const TopBar = ({ currentPath, onOpenFolder, onScreenshot, onEdit, onClea
                 </Button>
                 <Button
                     variant="ghost"
-                    className="h-9 px-2 rounded-lg hover:bg-white/5 text-white/70 flex gap-2"
+                    className={`h-9 px-2 rounded-lg hover:bg-black/10 dark:hover:bg-white/5 flex gap-2 ${theme === 'dark' ? 'text-white/70' : 'text-gray-600'}`}
                     onClick={() => setLanguage(nextLang)}
                     title={t('changeLanguage')}
                 >
@@ -82,14 +82,14 @@ export const TopBar = ({ currentPath, onOpenFolder, onScreenshot, onEdit, onClea
                 </Button>
                 <Button
                     variant="ghost"
-                    className={`h-9 w-9 p-0 rounded-lg transition-all ${showInfoPanel ? 'bg-primary/20 text-primary' : 'hover:bg-white/5 text-white/70'}`}
+                    className={`h-9 w-9 p-0 rounded-lg transition-all ${showInfoPanel ? 'bg-primary/20 text-primary' : `hover:bg-black/10 dark:hover:bg-white/5 ${theme === 'dark' ? 'text-white/70' : 'text-gray-600'}`}`}
                     onClick={onToggleInfo}
                     title={t('toggleInfo')}
                 >
                     <Info size={18} />
                 </Button>
-                <Button variant="ghost" className="h-9 w-9 p-0 rounded-lg hover:bg-white/5" onClick={onSave}>
-                    <Download size={18} className="text-white/70 hover:text-primary transition-colors" />
+                <Button variant="ghost" className={`h-9 w-9 p-0 rounded-lg hover:bg-black/10 dark:hover:bg-white/5 ${theme === 'dark' ? 'text-white/70' : 'text-gray-600'}`} onClick={onSave}>
+                    <Download size={18} className="hover:text-primary transition-colors" />
                 </Button>
             </div>
         </motion.div>
