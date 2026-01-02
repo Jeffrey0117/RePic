@@ -58,5 +58,7 @@
   "resetZoom": "Reset Zoom",
   "cropSuccess": "Crop completed!",
   "saveSuccess": "Saved successfully!",
-  "batchSuccess": "Batch crop completed! {count} images saved."
+  "batchSuccess": "Batch crop completed! {count} images saved.",
+  "lightMode": "Switch to Light Mode",
+  "darkMode": "Switch to Dark Mode"
 }

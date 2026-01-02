@@ -7,16 +7,20 @@ import {
     Download,
     Camera,
     Info,
-    Globe
+    Globe,
+    Sun,
+    Moon
 } from '../icons';
 import { Button } from './Button';
 import useI18n from '../../hooks/useI18n';
+import { useTheme } from '../../contexts/ThemeContext';
 
 // Check if electronAPI is available (injected via preload script)
 const electronAPI = window.electronAPI || null;
 
 export const TopBar = ({ currentPath, onOpenFolder, onScreenshot, onEdit, onClear, onSave, showInfoPanel, onToggleInfo }) => {
     const { t, language, setLanguage } = useI18n();
+    const { theme, toggleTheme } = useTheme();
 
     // Get folder name using electronAPI or fallback
     const getFolderName = () => {
@@ -59,6 +63,14 @@ export const TopBar = ({ currentPath, onOpenFolder, onScreenshot, onEdit, onClea
 
             {/* Right: Actions */}
             <div className="flex items-center gap-2">
+                <Button
+                    variant="ghost"
+                    className="h-9 w-9 p-0 rounded-lg hover:bg-white/5 text-white/70"
+                    onClick={toggleTheme}
+                    title={theme === 'dark' ? t('lightMode') : t('darkMode')}
+                >
+                    {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+                </Button>
                 <Button
                     variant="ghost"
                     className="h-9 px-2 rounded-lg hover:bg-white/5 text-white/70 flex gap-2"

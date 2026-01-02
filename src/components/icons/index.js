@@ -22,3 +22,5 @@ export { Loader2 } from './icons/Loader2';
 export { BarChart3 } from './icons/BarChart3';
 export { Database } from './icons/Database';
 export { Calendar } from './icons/Calendar';
+export { Sun } from './icons/Sun';
+export { Moon } from './icons/Moon';

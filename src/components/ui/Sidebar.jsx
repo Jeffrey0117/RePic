@@ -83,7 +83,7 @@ export const Sidebar = ({ files, currentIndex, onSelect, cacheVersion = 0 }) => 
                                 />
                             </div>
 
-                            <div className={`mt-1 text-[8px] truncate w-full px-1 text-center ${isActive ? 'text-primary' : 'text-white/40'}`}>
+                            <div className={`mt-1.5 text-[10px] truncate w-full px-1 text-center font-medium ${isActive ? 'text-primary' : 'text-white/70'}`}>
                                 {fileName}
                             </div>
                         </motion.div>

@@ -113,7 +113,7 @@ export const ImageViewer = ({ src }) => {
         <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="w-full h-full relative flex items-center justify-center overflow-hidden"
+            className="w-full h-full relative flex items-center justify-center overflow-hidden transition-all duration-300 ease-out"
         >
             {/* Zoom percentage indicator */}
             {scale !== 1 && (
@@ -130,7 +130,7 @@ export const ImageViewer = ({ src }) => {
                 ref={containerRef}
                 onDoubleClick={handleDoubleClick}
                 onMouseDown={handleMouseDown}
-                className="relative group shadow-[0_0_50px_rgba(0,0,0,0.5)] rounded-lg overflow-hidden border border-white/5 max-w-[calc(100%-32px)] max-h-[calc(100%-32px)]"
+                className="relative group shadow-[0_0_50px_rgba(0,0,0,0.5)] rounded-lg overflow-hidden border border-white/5 max-w-[calc(100%-32px)] max-h-[calc(100%-32px)] transition-all duration-300 ease-out"
                 style={{ cursor: getCursor() }}
             >
                 <img

@@ -58,5 +58,7 @@
   "resetZoom": "重設縮放",
   "cropSuccess": "裁切完成！",
   "saveSuccess": "儲存成功！",
-  "batchSuccess": "批量裁切完成！已儲存 {count} 張圖片。"
+  "batchSuccess": "批量裁切完成！已儲存 {count} 張圖片。",
+  "lightMode": "切換至淺色模式",
+  "darkMode": "切換至深色模式"
 }
