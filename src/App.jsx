@@ -331,7 +331,7 @@ function App() {
         />
 
         {/* Center: Main Viewport */}
-        <main className="flex-1 min-w-0 relative flex items-center justify-center p-4 main-viewport-bg">
+        <main className="flex-1 min-w-0 relative main-viewport-bg overflow-hidden transition-all duration-250">
           <AnimatePresence mode="wait">
             {localImage && !isEditing ? (
               <motion.div
@@ -339,7 +339,7 @@ function App() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="w-full h-full flex items-center justify-center"
+                className="absolute inset-4 flex items-center justify-center"
               >
                 <ImageViewer src={localImage} />
               </motion.div>
@@ -349,7 +349,7 @@ function App() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 0.4 }}
                 exit={{ opacity: 0 }}
-                className="w-full h-full flex flex-col items-center justify-center"
+                className="absolute inset-4 flex flex-col items-center justify-center"
               >
                 <Dropzone onImageUpload={handleImageUpload} onOpenFolder={handleOpenFile} />
                 <div className="mt-8 text-sm tracking-widest uppercase animate-pulse">
@@ -383,7 +383,7 @@ function App() {
           </AnimatePresence>
         </main>
 
-        {/* Right: Info Panel - always in DOM, controlled by CSS width transition */}
+        {/* Right: Info Panel - flex item with width transition */}
         <InfoPanel
           metadata={currentMetadata}
           isVisible={showInfoPanel && !isEditing}
