@@ -10,6 +10,7 @@ export const useFileSystem = () => {
     const [currentPath, setCurrentPath] = useState(null);
     const [currentMetadata, setCurrentMetadata] = useState(null);
     const [thumbCache, setThumbCache] = useState({}); // Simple memory cache
+    const [cacheVersion, setCacheVersion] = useState(0); // For cache busting after save
 
     // Initial Load - Desktop with retry mechanism
     useEffect(() => {
@@ -36,7 +37,7 @@ export const useFileSystem = () => {
         tryLoadDesktop();
     }, []);
 
-    const loadFolder = useCallback((folderPath) => {
+    const loadFolder = useCallback((folderPath, preserveIndex = false) => {
         const electronAPI = getElectronAPI();
         if (!electronAPI) return;
 
@@ -45,18 +46,24 @@ export const useFileSystem = () => {
 
             if (imageFiles.length > 0) {
                 setFiles(imageFiles);
-                setCurrentIndex(0);
-                setCurrentPath(folderPath); // Track current folder
+                if (!preserveIndex) {
+                    setCurrentIndex(0);
+                }
+                setCurrentPath(folderPath);
+
+                // Bump cache version to force image reload in Sidebar
+                if (preserveIndex) {
+                    setCacheVersion(v => v + 1);
+                    setThumbCache({});
+                }
 
                 // Prefetch thumbnails (limited set for performance)
                 imageFiles.slice(0, 30).forEach(file => {
-                    if (!thumbCache[file]) {
-                        const img = new Image();
-                        img.onload = () => {
-                            setThumbCache(prev => ({ ...prev, [file]: img.src }));
-                        };
-                        img.src = `file://${file}`;
-                    }
+                    const img = new Image();
+                    img.onload = () => {
+                        setThumbCache(prev => ({ ...prev, [file]: `${img.src}?t=${Date.now()}` }));
+                    };
+                    img.src = `file://${file}?t=${Date.now()}`;
                 });
             } else {
                 setFiles([]);
@@ -68,7 +75,7 @@ export const useFileSystem = () => {
             setFiles([]);
             setCurrentIndex(-1);
         }
-    }, [thumbCache]);
+    }, []);
 
     const nextImage = useCallback(() => {
         if (files.length === 0) return null;
@@ -123,6 +130,7 @@ export const useFileSystem = () => {
         prevImage,
         selectImage,
         currentPath,
-        currentMetadata
+        currentMetadata,
+        cacheVersion
     };
 };

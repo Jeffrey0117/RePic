@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 
-export const Sidebar = ({ files, currentIndex, onSelect }) => {
+export const Sidebar = ({ files, currentIndex, onSelect, cacheVersion = 0 }) => {
     return (
         <div className="w-[100px] h-full bg-surface/30 backdrop-blur-xl border-r border-white/5 flex flex-col overflow-hidden">
             <div className="flex-1 overflow-y-auto no-scrollbar py-4 px-2 space-y-3">
@@ -10,7 +10,7 @@ export const Sidebar = ({ files, currentIndex, onSelect }) => {
 
                     return (
                         <motion.div
-                            key={file}
+                            key={`${file}-${cacheVersion}`}
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
                             onClick={() => onSelect(index)}
@@ -25,7 +25,7 @@ export const Sidebar = ({ files, currentIndex, onSelect }) => {
                 ${isActive ? 'border-primary ring-2 ring-primary/20 scale-105' : 'border-transparent group-hover:border-white/30'}
               `}>
                                 <img
-                                    src={`file://${file}`}
+                                    src={`file://${file}?v=${cacheVersion}`}
                                     alt=""
                                     className="w-full h-full object-cover"
                                     loading="lazy"

@@ -1,50 +1,53 @@
 import { motion } from 'framer-motion';
 import { Download, X, Check } from 'lucide-react';
 import { Button } from './Button';
+import useI18n from '../../hooks/useI18n';
 
 export const SaveToolbar = ({ onSaveReplace, onSaveAs, onDiscard, isLocalFile }) => {
+    const { t } = useI18n();
+
     return (
         <motion.div
             initial={{ y: 100, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 100, opacity: 0 }}
-            className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-4 bg-surface/80 backdrop-blur-2xl px-6 py-3 rounded-2xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)]"
+            className="fixed bottom-8 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-3 bg-surface/90 backdrop-blur-2xl px-5 py-3 rounded-2xl border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)]"
         >
-            <div className="flex items-center gap-2 pr-4 border-r border-white/10 mr-2">
-                <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                <span className="text-xs font-bold uppercase tracking-widest text-white/90">Modified</span>
+            {/* Modified indicator */}
+            <div className="flex items-center gap-2 pr-3 border-r border-white/10">
+                <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                <span className="text-xs font-medium text-amber-500">{t('modified')}</span>
             </div>
 
-            <div className="flex items-center gap-2">
-                {isLocalFile && (
-                    <Button
-                        variant="primary"
-                        className="flex items-center gap-2 px-4 h-10 rounded-xl"
-                        onClick={onSaveReplace}
-                    >
-                        <Check size={16} />
-                        <span>Replace Original</span>
-                    </Button>
-                )}
-
+            {/* Action buttons */}
+            {isLocalFile && (
                 <Button
-                    variant="secondary"
-                    className="flex items-center gap-2 px-4 h-10 rounded-xl bg-white/5 border-white/5 hover:border-primary/50"
-                    onClick={onSaveAs}
+                    variant="primary"
+                    className="flex items-center gap-2 px-4 h-9 rounded-lg text-sm"
+                    onClick={onSaveReplace}
                 >
-                    <Download size={16} />
-                    <span>Save as New</span>
+                    <Check size={14} />
+                    <span>{t('replaceOriginal')}</span>
                 </Button>
+            )}
 
-                <Button
-                    variant="ghost"
-                    className="flex items-center gap-2 px-4 h-10 rounded-xl text-white/40 hover:text-danger hover:bg-danger/10"
-                    onClick={onDiscard}
-                >
-                    <X size={16} />
-                    <span>Discard</span>
-                </Button>
-            </div>
+            <Button
+                variant="secondary"
+                className="flex items-center gap-2 px-4 h-9 rounded-lg text-sm bg-white/5 border-white/10 hover:bg-white/10"
+                onClick={onSaveAs}
+            >
+                <Download size={14} />
+                <span>{t('saveAsNew')}</span>
+            </Button>
+
+            <Button
+                variant="ghost"
+                className="flex items-center gap-2 px-3 h-9 rounded-lg text-sm text-white/50 hover:text-red-400 hover:bg-red-500/10"
+                onClick={onDiscard}
+            >
+                <X size={14} />
+                <span>{t('discard')}</span>
+            </Button>
         </motion.div>
     );
 };

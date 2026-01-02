@@ -28,7 +28,8 @@ function App() {
     selectImage,
     currentIndex,
     currentPath,
-    currentMetadata
+    currentMetadata,
+    cacheVersion
   } = useFileSystem();
 
   // Local state for edits/UI
@@ -42,17 +43,17 @@ function App() {
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [batchCrop, setBatchCrop] = useState(null);
 
-  // Sync file system image with local view only when currentImage actually changes
+  // Sync file system image with local view only when currentImage or cacheVersion changes
   useEffect(() => {
     if (currentImage) {
-      setLocalImage(`file://${currentImage}`);
+      setLocalImage(`file://${currentImage}?v=${cacheVersion}`);
       setIsEditing(false); // Reset editing when switching images
       setIsModified(false); // Reset modified state
     } else {
       setLocalImage(null);
       setIsModified(false);
     }
-  }, [currentImage]); // Only depend on currentImage change
+  }, [currentImage, cacheVersion]); // Also depend on cacheVersion for refresh after save
 
   const handleImageUpload = (imgSrc) => {
     setLocalImage(imgSrc);
@@ -87,16 +88,33 @@ function App() {
 
   const handleSaveReplace = async () => {
     const electronAPI = getElectronAPI();
-    if (!currentImage || !localImage.startsWith('data:')) return;
-    if (!electronAPI) return;
+    console.log('[handleSaveReplace] currentImage:', currentImage);
+    console.log('[handleSaveReplace] localImage starts with data:', localImage?.startsWith('data:'));
 
+    if (!currentImage || !localImage.startsWith('data:')) {
+      console.log('[handleSaveReplace] Early return - missing data');
+      return;
+    }
+    if (!electronAPI) {
+      console.log('[handleSaveReplace] Early return - no electronAPI');
+      return;
+    }
+
+    console.log('[handleSaveReplace] Calling saveFile...');
     const result = await electronAPI.saveFile(currentImage, localImage);
+    console.log('[handleSaveReplace] Result:', result);
 
     if (result.success) {
-      // Reload the image to update viewer/sidebar
+      // Reload the image with cache-busting timestamp
       const originalPath = currentImage;
-      setLocalImage(`file://${originalPath}?t=${Date.now()}`);
+      const timestamp = Date.now();
+      setLocalImage(`file://${originalPath}?t=${timestamp}`);
       setIsModified(false);
+
+      // Refresh folder to update sidebar thumbnails (preserve current position)
+      if (currentPath) {
+        loadFolder(currentPath, true);
+      }
     } else {
       alert(t("failedToSave", { error: result.error }));
     }
@@ -274,6 +292,7 @@ function App() {
         <Sidebar
           files={files}
           currentIndex={currentIndex}
+          cacheVersion={cacheVersion}
           onSelect={selectImage}
         />
 
