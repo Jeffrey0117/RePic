@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from '../../lib/motion';
 import useI18n from '../../hooks/useI18n';
 
-export const ImageViewer = ({ src }) => {
+export const ImageViewer = ({ src, showInfoPanel = true }) => {
     const { t } = useI18n();
     const containerRef = useRef(null);
     const imageRef = useRef(null);
@@ -11,6 +11,12 @@ export const ImageViewer = ({ src }) => {
     const [position, setPosition] = useState({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+
+    // Calculate max width based on sidebar (~150px) + InfoPanel (280px if shown) + margins
+    const sidebarWidth = 150;
+    const infoPanelWidth = showInfoPanel ? 280 : 0;
+    const margins = 80;
+    const maxImageWidth = `calc(100vw - ${sidebarWidth + infoPanelWidth + margins}px)`;
 
     // Reset zoom and position when image changes
     useEffect(() => {
@@ -137,13 +143,15 @@ export const ImageViewer = ({ src }) => {
                     ref={imageRef}
                     src={src}
                     alt="View"
-                    className="block select-none transition-all duration-300 ease-out"
+                    className="block select-none"
                     style={{
-                        maxWidth: 'calc(100vw - 500px)',
+                        maxWidth: maxImageWidth,
                         maxHeight: 'calc(100vh - 180px)',
+                        minWidth: '200px',
+                        minHeight: '150px',
                         objectFit: 'contain',
                         transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
-                        transition: isDragging ? 'none' : 'transform 0.1s ease-out, max-width 0.3s ease-out'
+                        transition: isDragging ? 'none' : 'transform 0.1s ease-out, max-width 0.3s ease-out, max-height 0.3s ease-out'
                     }}
                     draggable={false}
                 />

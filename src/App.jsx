@@ -341,7 +341,7 @@ function App() {
                 exit={{ opacity: 0 }}
                 className="w-full h-full flex items-center justify-center"
               >
-                <ImageViewer src={localImage} />
+                <ImageViewer src={localImage} showInfoPanel={showInfoPanel} />
               </motion.div>
             ) : !localImage ? (
               <motion.div
