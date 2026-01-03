@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from '../../lib/motion';
 import { X, FolderOutput, Replace, Loader2, Check, FolderOpen } from '../icons';
 import { Button } from './Button';
 import useI18n from '../../hooks/useI18n';
+import { useTheme } from '../../contexts/ThemeContext';
 
 // Check if electronAPI is available (injected via preload script)
 const electronAPI = window.electronAPI || null;
@@ -16,6 +17,8 @@ export const BatchCropModal = ({
     onConfirm
 }) => {
     const { t } = useI18n();
+    const { theme } = useTheme();
+    const isDark = theme === 'dark';
     const [selectedFiles, setSelectedFiles] = useState(new Set());
     const [outputMode, setOutputMode] = useState('replace');
     const [customDir, setCustomDir] = useState(null);
@@ -102,31 +105,31 @@ export const BatchCropModal = ({
                     animate={{ scale: 1, opacity: 1 }}
                     exit={{ scale: 0.95, opacity: 0 }}
                     onClick={e => e.stopPropagation()}
-                    className="bg-surface border border-white/10 rounded-2xl p-6 w-full max-w-2xl shadow-2xl max-h-[90vh] flex flex-col"
+                    className={`rounded-2xl p-6 w-full max-w-2xl shadow-2xl max-h-[90vh] flex flex-col border ${isDark ? 'bg-surface border-white/10' : 'bg-white border-gray-200'}`}
                 >
                     {/* Header */}
                     <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-lg font-semibold text-white">
-                            Apply Crop to Selected
+                        <h2 className={`text-lg font-semibold ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                            {t('applyCropToSelected')}
                         </h2>
                         <button
                             onClick={onClose}
-                            className="p-1 hover:bg-white/10 rounded-lg transition-colors"
+                            className={`p-1 rounded-lg transition-colors ${isDark ? 'hover:bg-white/10' : 'hover:bg-gray-100'}`}
                         >
-                            <X size={20} className="text-white/60" />
+                            <X size={20} className={isDark ? 'text-white/60' : 'text-gray-500'} />
                         </button>
                     </div>
 
                     {/* Crop Info */}
-                    <div className="bg-white/5 rounded-xl p-3 mb-4 flex items-center justify-between">
+                    <div className={`rounded-xl p-3 mb-4 flex items-center justify-between ${isDark ? 'bg-white/5' : 'bg-gray-100'}`}>
                         <div>
-                            <div className="text-xs text-white/40">{t("cropRegion")}</div>
-                            <div className="text-sm font-medium text-white">
+                            <div className={`text-xs ${isDark ? 'text-white/40' : 'text-gray-500'}`}>{t("cropRegion")}</div>
+                            <div className={`text-sm font-medium ${isDark ? 'text-white' : 'text-gray-900'}`}>
                                 {Math.round(crop?.width || 0)}% × {Math.round(crop?.height || 0)}%
                             </div>
                         </div>
                         <div className="text-right">
-                            <div className="text-xs text-white/40">{t("selected")}</div>
+                            <div className={`text-xs ${isDark ? 'text-white/40' : 'text-gray-500'}`}>{t("selected")}</div>
                             <div className="text-sm font-bold text-primary">
                                 {selectedFiles.size} {t('images')}
                             </div>
@@ -138,15 +141,15 @@ export const BatchCropModal = ({
                         <div className="flex gap-2 mb-3">
                             <button
                                 onClick={selectAll}
-                                className="text-xs px-3 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all"
+                                className={`text-xs px-3 py-1 rounded-lg transition-all ${isDark ? 'bg-white/5 hover:bg-white/10 text-white/60 hover:text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-900'}`}
                             >
-                                Select All
+                                {t('selectAll')}
                             </button>
                             <button
                                 onClick={selectNone}
-                                className="text-xs px-3 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-all"
+                                className={`text-xs px-3 py-1 rounded-lg transition-all ${isDark ? 'bg-white/5 hover:bg-white/10 text-white/60 hover:text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-900'}`}
                             >
-                                Clear
+                                {t('clear')}
                             </button>
                         </div>
                     )}
@@ -165,12 +168,12 @@ export const BatchCropModal = ({
                                             key={filePath}
                                             onClick={() => !isCurrentImage && toggleFile(index)}
                                             disabled={isCurrentImage}
-                                            className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all bg-black/40 ${
+                                            className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${isDark ? 'bg-black/40' : 'bg-gray-100'} ${
                                                 isCurrentImage
                                                     ? 'border-amber-500/50 opacity-50 cursor-not-allowed'
                                                     : isSelected
                                                     ? 'border-primary ring-2 ring-primary/30'
-                                                    : 'border-transparent hover:border-white/20'
+                                                    : isDark ? 'border-transparent hover:border-white/20' : 'border-transparent hover:border-gray-300'
                                             }`}
                                         >
                                             <img
@@ -183,7 +186,7 @@ export const BatchCropModal = ({
                                             {isCurrentImage && (
                                                 <div className="absolute inset-0 flex items-center justify-center bg-black/50">
                                                     <span className="text-[10px] text-amber-400 font-medium px-2 py-0.5 bg-amber-500/20 rounded">
-                                                        Current
+                                                        {t('current')}
                                                     </span>
                                                 </div>
                                             )}
@@ -216,7 +219,7 @@ export const BatchCropModal = ({
                                     className={`flex-1 flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${
                                         outputMode === 'replace'
                                             ? 'border-primary bg-primary/10'
-                                            : 'border-white/10 hover:border-white/20'
+                                            : isDark ? 'border-white/10 hover:border-white/20' : 'border-gray-200 hover:border-gray-300'
                                     }`}
                                 >
                                     <input
@@ -227,15 +230,15 @@ export const BatchCropModal = ({
                                         onChange={() => setOutputMode('replace')}
                                         className="sr-only"
                                     />
-                                    <Replace size={16} className={outputMode === 'replace' ? 'text-primary' : 'text-white/40'} />
-                                    <span className="text-sm text-white">{t('replaceOriginal')}</span>
+                                    <Replace size={16} className={outputMode === 'replace' ? 'text-primary' : isDark ? 'text-white/40' : 'text-gray-400'} />
+                                    <span className={`text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>{t('replaceOriginal')}</span>
                                 </label>
 
                                 <label
                                     className={`flex-1 flex items-center gap-2 p-3 rounded-xl border cursor-pointer transition-all ${
                                         outputMode === 'folder'
                                             ? 'border-primary bg-primary/10'
-                                            : 'border-white/10 hover:border-white/20'
+                                            : isDark ? 'border-white/10 hover:border-white/20' : 'border-gray-200 hover:border-gray-300'
                                     }`}
                                 >
                                     <input
@@ -246,8 +249,8 @@ export const BatchCropModal = ({
                                         onChange={() => setOutputMode('folder')}
                                         className="sr-only"
                                     />
-                                    <FolderOutput size={16} className={outputMode === 'folder' ? 'text-primary' : 'text-white/40'} />
-                                    <span className="text-sm text-white">{t('croppedFolder')}</span>
+                                    <FolderOutput size={16} className={outputMode === 'folder' ? 'text-primary' : isDark ? 'text-white/40' : 'text-gray-400'} />
+                                    <span className={`text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>{t('croppedFolder')}</span>
                                 </label>
                             </div>
 
@@ -257,11 +260,11 @@ export const BatchCropModal = ({
                                 className={`w-full flex items-center gap-2 p-3 rounded-xl border transition-all ${
                                     outputMode === 'custom'
                                         ? 'border-primary bg-primary/10'
-                                        : 'border-white/10 hover:border-white/20'
+                                        : isDark ? 'border-white/10 hover:border-white/20' : 'border-gray-200 hover:border-gray-300'
                                 }`}
                             >
-                                <FolderOpen size={16} className={outputMode === 'custom' ? 'text-primary' : 'text-white/40'} />
-                                <span className="text-sm text-white">
+                                <FolderOpen size={16} className={outputMode === 'custom' ? 'text-primary' : isDark ? 'text-white/40' : 'text-gray-400'} />
+                                <span className={`text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>
                                     {customDir ? t('saveTo', { folder: getBasename(customDir) }) : t('selectDirectory')}
                                 </span>
                             </button>
@@ -273,11 +276,11 @@ export const BatchCropModal = ({
                         <div className="mb-4">
                             <div className="flex items-center gap-2 mb-3">
                                 <Loader2 size={16} className="text-primary animate-spin" />
-                                <span className="text-sm text-white">
+                                <span className={`text-sm ${isDark ? 'text-white' : 'text-gray-900'}`}>
                                     {t('processing')} {progress.current} / {progress.total}
                                 </span>
                             </div>
-                            <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
+                            <div className={`w-full h-2 rounded-full overflow-hidden ${isDark ? 'bg-white/10' : 'bg-gray-200'}`}>
                                 <motion.div
                                     className="h-full bg-primary"
                                     initial={{ width: 0 }}
@@ -293,9 +296,9 @@ export const BatchCropModal = ({
                             variant="ghost"
                             onClick={onClose}
                             disabled={isProcessing}
-                            className="flex-1"
+                            className={`flex-1 ${isDark ? '' : 'text-gray-700 hover:text-gray-900 hover:bg-gray-100'}`}
                         >
-                            Cancel
+                            {t('cancel')}
                         </Button>
                         <Button
                             variant="primary"
