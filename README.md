@@ -38,3 +38,6 @@ The executable will be in the `release` folder.
 - **Styling**: TailwindCSS v4
 - **Cropping**: react-image-crop
 - **Icons**: Lucide React
+
+## Roadmap
+- [ ] Image upload feature (cloud storage integration)
