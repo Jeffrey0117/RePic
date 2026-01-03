@@ -1,6 +1,10 @@
-const { app, BrowserWindow, Menu, ipcMain, desktopCapturer, dialog } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
+
+// V8 Memory Optimization (from ELECTRON-SLIM-REPORT)
+app.commandLine.appendSwitch('js-flags', '--max-old-space-size=256');
+app.commandLine.appendSwitch('js-flags', '--optimize-for-size');
 
 // Native image processing via @modern-ffi/core + libvips
 let libvips = null;
@@ -61,40 +65,6 @@ function createWindow() {
 }
 
 function setupIpcHandlers() {
-    ipcMain.handle('hide-window', () => {
-        if (!mainWindow) return false;
-        mainWindow.minimize();
-        mainWindow.hide();
-        return true;
-    });
-
-    ipcMain.handle('show-window', () => {
-        if (!mainWindow) return false;
-        mainWindow.show();
-        mainWindow.focus();
-        return true;
-    });
-
-    ipcMain.handle('get-desktop-sources', async () => {
-        const { screen } = require('electron');
-        const primaryDisplay = screen.getPrimaryDisplay();
-        const { width, height } = primaryDisplay.size;
-
-        const sources = await desktopCapturer.getSources({
-            types: ['screen'],
-            thumbnailSize: {
-                width: width * primaryDisplay.scaleFactor,
-                height: height * primaryDisplay.scaleFactor
-            }
-        });
-
-        return sources.map(s => ({
-            id: s.id,
-            name: s.name,
-            thumbnail: s.thumbnail.toDataURL()
-        }));
-    });
-
     ipcMain.handle('select-directory', async () => {
         if (!mainWindow) return null;
         const result = await dialog.showOpenDialog(mainWindow, {
