@@ -43,14 +43,53 @@
       "!**/node_modules/**/LICENCE*",
       "!**/node_modules/**/license*"
     ],
+    "fileAssociations": [
+      {
+        "ext": ["jpg", "jpeg"],
+        "name": "JPEG Image",
+        "description": "JPEG Image File",
+        "mimeType": "image/jpeg",
+        "role": "Viewer"
+      },
+      {
+        "ext": "png",
+        "name": "PNG Image",
+        "description": "PNG Image File",
+        "mimeType": "image/png",
+        "role": "Viewer"
+      },
+      {
+        "ext": "gif",
+        "name": "GIF Image",
+        "description": "GIF Image File",
+        "mimeType": "image/gif",
+        "role": "Viewer"
+      },
+      {
+        "ext": "webp",
+        "name": "WebP Image",
+        "description": "WebP Image File",
+        "mimeType": "image/webp",
+        "role": "Viewer"
+      },
+      {
+        "ext": "bmp",
+        "name": "BMP Image",
+        "description": "BMP Image File",
+        "mimeType": "image/bmp",
+        "role": "Viewer"
+      }
+    ],
     "win": {
       "target": "nsis",
       "signAndEditExecutable": false,
       "icon": "repic-logo.png"
     },
     "nsis": {
-      "oneClick": true,
-      "deleteAppDataOnUninstall": true
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": true,
+      "perMachine": false
     }
   },
   "dependencies": {

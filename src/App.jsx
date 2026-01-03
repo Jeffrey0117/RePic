@@ -24,6 +24,7 @@ function App() {
     nextImage,
     prevImage,
     loadFolder,
+    loadFile,
     files,
     selectImage,
     currentIndex,
@@ -56,6 +57,16 @@ function App() {
       setIsModified(false);
     }
   }, [currentImage, cacheVersion]); // Also depend on cacheVersion for refresh after save
+
+  // Listen for file open events (from file association / command line)
+  useEffect(() => {
+    const electronAPI = getElectronAPI();
+    if (electronAPI?.onOpenFile) {
+      electronAPI.onOpenFile((filePath) => {
+        loadFile(filePath);
+      });
+    }
+  }, [loadFile]);
 
   const handleOpenFile = async () => {
     const electronAPI = getElectronAPI();

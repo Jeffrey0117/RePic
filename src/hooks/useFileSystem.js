@@ -93,6 +93,29 @@ export const useFileSystem = () => {
         }
     }, [files]);
 
+    // Load single file (from file association / command line)
+    const loadFile = useCallback((filePath) => {
+        const electronAPI = getElectronAPI();
+        if (!electronAPI || !filePath) return;
+
+        try {
+            // Get the folder containing the file
+            const folderPath = electronAPI.path.dirname(filePath);
+            const imageFiles = electronAPI.getFilesInDirectory(folderPath);
+
+            if (imageFiles.length > 0) {
+                setFiles(imageFiles);
+                setCurrentPath(folderPath);
+
+                // Find the index of the opened file
+                const fileIndex = imageFiles.findIndex(f => f === filePath);
+                setCurrentIndex(fileIndex >= 0 ? fileIndex : 0);
+            }
+        } catch (err) {
+            console.error("Failed to load file", err);
+        }
+    }, []);
+
     const currentImage = files[currentIndex] || null;
 
     useEffect(() => {
@@ -126,6 +149,7 @@ export const useFileSystem = () => {
         currentIndex,
         currentImage,
         loadFolder,
+        loadFile,
         nextImage,
         prevImage,
         selectImage,

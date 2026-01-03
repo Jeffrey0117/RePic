@@ -11,6 +11,42 @@ let libvips = null;
 let nativeAvailable = false;
 
 let mainWindow;
+let fileToOpen = null; // File path from command line or file association
+
+// Single instance lock - prevent multiple instances
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+    app.quit();
+} else {
+    // Handle second instance (when user opens another file while app is running)
+    app.on('second-instance', (_event, commandLine) => {
+        // Find image file from command line args
+        const filePath = commandLine.find(arg => {
+            if (arg.startsWith('-') || arg.startsWith('--')) return false;
+            const ext = path.extname(arg).toLowerCase();
+            return ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'].includes(ext);
+        });
+
+        if (filePath && mainWindow) {
+            // Send file to renderer
+            mainWindow.webContents.send('open-file', filePath);
+            // Focus the window
+            if (mainWindow.isMinimized()) mainWindow.restore();
+            mainWindow.focus();
+        }
+    });
+}
+
+// Get file from command line args (first launch)
+function getFileFromArgs() {
+    const args = process.argv.slice(app.isPackaged ? 1 : 2);
+    return args.find(arg => {
+        if (arg.startsWith('-') || arg.startsWith('--')) return false;
+        const ext = path.extname(arg).toLowerCase();
+        return ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'].includes(ext);
+    });
+}
 
 // Input validation helpers
 function isValidPath(filePath) {
@@ -60,6 +96,11 @@ function createWindow() {
         // Open DevTools in dev mode for debugging
         if (!app.isPackaged) {
             mainWindow.webContents.openDevTools();
+        }
+        // Send file to open if provided via command line
+        if (fileToOpen) {
+            mainWindow.webContents.send('open-file', fileToOpen);
+            fileToOpen = null;
         }
     });
 }
@@ -224,6 +265,9 @@ app.whenReady().then(async () => {
         console.warn('[main] Native libvips not available:', e.message);
         nativeAvailable = false;
     }
+
+    // Get file from command line (for file association)
+    fileToOpen = getFileFromArgs();
 
     setupIpcHandlers();
     createWindow();

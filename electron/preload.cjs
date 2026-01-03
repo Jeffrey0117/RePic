@@ -20,6 +20,11 @@ function isValidBase64Data(data) {
 
 // Expose protected methods to renderer via contextBridge
 contextBridge.exposeInMainWorld('electronAPI', {
+    // Listen for file open events (from file association / command line)
+    onOpenFile: (callback) => {
+        ipcRenderer.on('open-file', (_event, filePath) => callback(filePath));
+    },
+
     // Directory selection dialog
     selectDirectory: async () => {
         return await ipcRenderer.invoke('select-directory');
