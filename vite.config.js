@@ -11,11 +11,19 @@ export default defineConfig({
   build: {
     target: 'esnext',
     minify: 'esbuild',
+    sourcemap: false,
+    cssCodeSplit: true,
+    chunkSizeWarningLimit: 500,
     rollupOptions: {
       output: {
         manualChunks: {
-          'vendor-react': ['react', 'react-dom']
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-crop': ['react-image-crop']
         }
+      },
+      treeshake: {
+        moduleSideEffects: false,
+        propertyReadSideEffects: false
       }
     }
   }

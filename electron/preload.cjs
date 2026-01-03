@@ -65,11 +65,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
         });
     },
 
-    // Get screen sources for capture
-    getScreenSources: async () => {
-        return await ipcRenderer.invoke('get-desktop-sources');
-    },
-
     // Get file metadata
     getFileMetadata: async (filePath) => {
         if (!isValidPath(filePath)) {
@@ -124,26 +119,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Show save dialog
     showSaveDialog: async (defaultPath) => {
         return await ipcRenderer.invoke('show-save-dialog', defaultPath);
-    },
-
-    // Window controls
-    hideWindow: async () => {
-        return await ipcRenderer.invoke('hide-window');
-    },
-
-    showWindow: async () => {
-        return await ipcRenderer.invoke('show-window');
-    },
-
-    // Capture overlay IPC
-    onInitCaptureData: (callback) => {
-        const handler = (event, dataUrl) => callback(dataUrl);
-        ipcRenderer.on('init-capture-data', handler);
-        return () => ipcRenderer.removeListener('init-capture-data', handler);
-    },
-
-    closeCaptureWindow: async (dataUrl) => {
-        return await ipcRenderer.invoke('close-capture-window', dataUrl);
     },
 
     // Path utilities (safe exposure of path module)
