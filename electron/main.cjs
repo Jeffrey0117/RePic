@@ -2,13 +2,11 @@ const { app, BrowserWindow, Menu, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
-// V8 Memory Optimization (from ELECTRON-SLIM-REPORT)
+// V8 Startup Optimization
 app.commandLine.appendSwitch('js-flags', '--max-old-space-size=256');
-app.commandLine.appendSwitch('js-flags', '--optimize-for-size');
-
-// Native image processing via @modern-ffi/core + libvips
-let libvips = null;
-let nativeAvailable = false;
+// Enable V8 code cache for faster startup
+app.commandLine.appendSwitch('js-flags', '--use-strict');
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
 
 let mainWindow;
 let fileToOpen = null; // File path from command line or file association
@@ -71,7 +69,7 @@ function createWindow() {
         backgroundColor: '#000000',
         titleBarStyle: 'hiddenInset',
         icon: path.join(__dirname, '../repic-logo.png'),
-        show: false, // Don't show until ready
+        show: true, // Show immediately for faster perceived startup
         webPreferences: {
             preload: path.join(__dirname, 'preload.cjs'),
             nodeIntegration: false,
@@ -87,18 +85,13 @@ function createWindow() {
 
     if (isDev) {
         mainWindow.loadURL('http://localhost:3000');
+        mainWindow.webContents.openDevTools();
     } else {
         mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
     }
 
-    // Show window when ready to avoid white flash
-    mainWindow.once('ready-to-show', () => {
-        mainWindow.show();
-        // Open DevTools in dev mode for debugging
-        if (!app.isPackaged) {
-            mainWindow.webContents.openDevTools();
-        }
-        // Send file to open if provided via command line
+    // Send file to open when renderer is ready
+    mainWindow.webContents.once('did-finish-load', () => {
         if (fileToOpen) {
             mainWindow.webContents.send('open-file', fileToOpen);
             fileToOpen = null;
@@ -176,28 +169,14 @@ function setupIpcHandlers() {
         return result;
     });
 
-    // Native crop using libvips + @modern-ffi/core (fast, low memory)
-    ipcMain.handle('native-crop', async (event, { inputPath, outputPath, crop }) => {
-        console.log('[native-crop] Received:', { inputPath, outputPath, crop });
-
-        if (!isValidPath(inputPath) || !isValidPath(outputPath)) {
-            return { success: false, error: 'Invalid path' };
-        }
-
-        // Try native libvips first
-        if (nativeAvailable && libvips) {
-            const result = await libvips.cropImage(inputPath, outputPath, crop);
-            console.log('[native-crop] libvips result:', result);
-            return result;
-        }
-
-        // Fallback: not available
+    // Native crop - not available (using browser canvas instead)
+    ipcMain.handle('native-crop', async () => {
         return { success: false, error: 'Native processing not available', fallback: true };
     });
 
     // Check if native processing is available
     ipcMain.handle('native-available', () => {
-        return { available: nativeAvailable };
+        return { available: false };
     });
 
     // Batch crop - save cropped image data to file
@@ -256,17 +235,7 @@ function setupIpcHandlers() {
     });
 }
 
-app.whenReady().then(async () => {
-    // Try to initialize native libvips
-    try {
-        libvips = require('./native/libvips.cjs');
-        nativeAvailable = await libvips.init();
-        console.log('[main] Native libvips available:', nativeAvailable);
-    } catch (e) {
-        console.warn('[main] Native libvips not available:', e.message);
-        nativeAvailable = false;
-    }
-
+app.whenReady().then(() => {
     // Get file from command line (for file association)
     fileToOpen = getFileFromArgs();
 

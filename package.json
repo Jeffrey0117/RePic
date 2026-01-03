@@ -16,7 +16,7 @@
     "appId": "com.repic.app",
     "productName": "Repic",
     "asar": true,
-    "compression": "maximum",
+    "compression": "normal",
     "removePackageScripts": true,
     "directories": {
       "output": "release"
