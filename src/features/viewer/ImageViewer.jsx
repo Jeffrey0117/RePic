@@ -105,7 +105,7 @@ export const ImageViewer = ({ src }) => {
     const getCursor = () => {
         if (isDragging) return 'grabbing';
         if (scale > 1) return 'grab';
-        return 'zoom-in';
+        return 'default';
     };
 
     return (
