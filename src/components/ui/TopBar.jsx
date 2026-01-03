@@ -40,22 +40,30 @@ export const TopBar = ({ currentPath, onOpenFolder, isEditing, onToggleEdit, onC
         <motion.div
             initial={{ y: -50, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            className="h-14 w-full bg-surface/30 backdrop-blur-xl border-b border-white/5 flex items-center justify-between px-6 z-30"
+            className={`h-14 w-full backdrop-blur-xl border-b flex items-center justify-between px-6 z-30 ${
+                theme === 'dark'
+                    ? 'bg-surface/30 border-white/5'
+                    : 'bg-white/80 border-black/10'
+            }`}
         >
             {/* Left: Folder Info */}
             <div
-                className="flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-lg cursor-pointer transition-all border border-white/5"
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg cursor-pointer transition-all border ${
+                    theme === 'dark'
+                        ? 'bg-white/5 hover:bg-white/10 border-white/5'
+                        : 'bg-black/5 hover:bg-black/10 border-black/10'
+                }`}
                 onClick={onOpenFolder}
             >
                 <FolderOpen size={16} className="text-primary" />
-                <span className="text-xs font-medium text-white/80 max-w-[200px] truncate">{folderName}</span>
+                <span className={`text-xs font-medium max-w-[200px] truncate ${theme === 'dark' ? 'text-white/80' : 'text-gray-700'}`}>{folderName}</span>
             </div>
 
             {/* Center: Main Tools */}
-            <div className="flex items-center bg-black/20 rounded-xl p-1 border border-white/5">
-                <ToolButton icon={RotateCcw} title={t('refresh')} onClick={() => window.location.reload()} />
-                <ToolButton icon={Scissors} title={t('editArea')} onClick={onToggleEdit} active={isEditing} />
-                <ToolButton icon={Trash2} title={t('delete')} className="text-danger" onClick={onClear} />
+            <div className={`flex items-center rounded-xl p-1 border ${theme === 'dark' ? 'bg-black/20 border-white/5' : 'bg-black/5 border-black/10'}`}>
+                <ToolButton icon={RotateCcw} title={t('refresh')} onClick={() => window.location.reload()} theme={theme} />
+                <ToolButton icon={Scissors} title={t('editArea')} onClick={onToggleEdit} active={isEditing} theme={theme} />
+                <ToolButton icon={Trash2} title={t('delete')} className="text-danger" onClick={onClear} theme={theme} />
             </div>
 
             {/* Right: Actions */}
@@ -93,11 +101,17 @@ export const TopBar = ({ currentPath, onOpenFolder, isEditing, onToggleEdit, onC
     );
 };
 
-const ToolButton = ({ icon: Icon, title, onClick, className = "", active = false }) => (
+const ToolButton = ({ icon: Icon, title, onClick, className = "", active = false, theme = 'dark' }) => (
     <button
         onClick={onClick}
         title={title}
-        className={`p-2.5 rounded-lg transition-all ${active ? 'bg-primary/20 text-primary' : 'hover:bg-white/10 text-white/60 hover:text-white'} ${className}`}
+        className={`p-2.5 rounded-lg transition-all ${
+            active
+                ? 'bg-primary/20 text-primary'
+                : theme === 'dark'
+                    ? 'hover:bg-white/10 text-white/60 hover:text-white'
+                    : 'hover:bg-black/10 text-gray-500 hover:text-gray-800'
+        } ${className}`}
     >
         <Icon size={22} />
     </button>

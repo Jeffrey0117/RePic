@@ -34,7 +34,7 @@ export const InfoPanel = memo(function InfoPanel({ metadata, isVisible = true })
     return (
         <aside
             style={panelStyle}
-            className="h-full bg-surface/30 backdrop-blur-xl border-l border-white/5 shrink-0"
+            className="h-full bg-surface/90 backdrop-blur-xl border-l border-white/5 shrink-0"
         >
             {/* Fixed width inner container prevents content squish */}
             <div className="flex flex-col h-full p-6" style={{ width: PANEL_WIDTH, minWidth: PANEL_WIDTH }}>

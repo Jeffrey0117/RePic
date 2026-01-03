@@ -20,13 +20,57 @@
 /* Light theme overrides */
 [data-theme="light"] {
   color-scheme: light;
-  --color-background: #f5f5f5;
-  --color-surface: #ffffff;
-  --color-primary: #007AFF;
+  --color-background: #e8e8e8;
+  --color-surface: #f2f2f2;
+  --color-primary: #0066CC;
   --color-danger: #FF3B30;
   --color-text: #1a1a1a;
-  --color-text-secondary: #666666;
+  --color-text-secondary: #555555;
   --shadow-ios: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* Light theme - force dark text and light backgrounds */
+[data-theme="light"] .text-white {
+  color: #1a1a1a !important;
+}
+
+[data-theme="light"] .text-white\/60,
+[data-theme="light"] .text-white\/50,
+[data-theme="light"] .text-white\/40,
+[data-theme="light"] .text-white\/30,
+[data-theme="light"] .text-white\/20 {
+  color: rgba(0, 0, 0, 0.6) !important;
+}
+
+[data-theme="light"] .border-white\/5,
+[data-theme="light"] .border-white\/10 {
+  border-color: rgba(0, 0, 0, 0.1) !important;
+}
+
+[data-theme="light"] .border-primary\/20 {
+  border-color: rgba(0, 102, 204, 0.3) !important;
+}
+
+/* Light theme - fix dark backgrounds */
+[data-theme="light"] .bg-\[\#0A0A0A\],
+[data-theme="light"] .bg-\[\#0f0f0f\],
+[data-theme="light"] .bg-black {
+  background-color: #d8d8d8 !important;
+}
+
+[data-theme="light"] .bg-black\/50,
+[data-theme="light"] .bg-black\/40,
+[data-theme="light"] .bg-black\/30 {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Light theme - toolbar buttons */
+[data-theme="light"] .bg-white\/10 {
+  background-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+[data-theme="light"] .hover\:bg-white\/20:hover {
+  background-color: rgba(0, 0, 0, 0.15) !important;
 }
 
 [data-theme="light"] .ReactCrop__crop-selection {
@@ -65,7 +109,7 @@ body {
 }
 
 [data-theme="light"] .main-viewport-bg {
-  background-color: rgba(200, 200, 200, 0.3);
+  background-color: #d8d8d8 !important;
 }
 
 /* Hide scrollbar for Chrome, Safari and Opera */
