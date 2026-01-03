@@ -42,6 +42,12 @@
   color: rgba(0, 0, 0, 0.6) !important;
 }
 
+/* Light theme - file names in sidebar */
+[data-theme="light"] .text-white\/80,
+[data-theme="light"] .text-white\/70 {
+  color: rgba(0, 0, 0, 0.8) !important;
+}
+
 [data-theme="light"] .border-white\/5,
 [data-theme="light"] .border-white\/10 {
   border-color: rgba(0, 0, 0, 0.1) !important;
