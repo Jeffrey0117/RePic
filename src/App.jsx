@@ -46,6 +46,9 @@ function App() {
   // Toast state
   const [toast, setToast] = useState({ visible: false, message: '' });
 
+  // Upload state
+  const [isUploading, setIsUploading] = useState(false);
+
   // Sync file system image with local view only when currentImage or cacheVersion changes
   useEffect(() => {
     if (currentImage) {
@@ -287,6 +290,65 @@ function App() {
     link.click();
   };
 
+  const handleUpload = async () => {
+    if (!localImage) {
+      setToast({ visible: true, message: t('noImageToUpload') });
+      return;
+    }
+
+    setIsUploading(true);
+
+    try {
+      // Convert image to blob
+      let blob;
+      if (localImage.startsWith('data:')) {
+        // Base64 data URL
+        const response = await fetch(localImage);
+        blob = await response.blob();
+      } else if (localImage.startsWith('file://')) {
+        // Local file - need to read via electronAPI
+        const electronAPI = getElectronAPI();
+        if (electronAPI) {
+          const cleanPath = localImage.replace('file://', '').split('?')[0];
+          const dataUrl = electronAPI.readFile(cleanPath);
+          if (dataUrl) {
+            const response = await fetch(dataUrl);
+            blob = await response.blob();
+          }
+        }
+      }
+
+      if (!blob) {
+        throw new Error('Failed to read image');
+      }
+
+      // Create form data
+      const formData = new FormData();
+      formData.append('file', blob, `repic-${Date.now()}.png`);
+
+      // Upload to urusai.cc
+      const response = await fetch('https://api.urusai.cc/v1/upload', {
+        method: 'POST',
+        body: formData
+      });
+
+      const result = await response.json();
+
+      if (result.url || result.direct) {
+        const imageUrl = result.direct || result.url;
+        // Copy URL to clipboard
+        await navigator.clipboard.writeText(imageUrl);
+        setToast({ visible: true, message: t('uploadSuccess') });
+      } else {
+        throw new Error(result.error || 'Unknown error');
+      }
+    } catch (error) {
+      setToast({ visible: true, message: t('uploadFailed', { error: error.message }) });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   // Keyboard Navigation
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -309,6 +371,8 @@ function App() {
         onToggleEdit={() => setIsEditing(!isEditing)}
         onClear={handleClear}
         onSave={handleSave}
+        onUpload={handleUpload}
+        isUploading={isUploading}
         showInfoPanel={showInfoPanel}
         onToggleInfo={() => setShowInfoPanel(!showInfoPanel)}
       />

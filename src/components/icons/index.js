@@ -21,3 +21,4 @@ export { Database } from './Database';
 export { Calendar } from './Calendar';
 export { Sun } from './Sun';
 export { Moon } from './Moon';
+export { Upload } from './Upload';

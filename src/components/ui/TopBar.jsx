@@ -5,6 +5,7 @@ import {
     Scissors,
     Trash2,
     Download,
+    Upload,
     Info,
     Globe,
     Sun,
@@ -17,7 +18,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 // Check if electronAPI is available (injected via preload script)
 const electronAPI = window.electronAPI || null;
 
-export const TopBar = ({ currentPath, onOpenFolder, isEditing, onToggleEdit, onClear, onSave, showInfoPanel, onToggleInfo }) => {
+export const TopBar = ({ currentPath, onOpenFolder, isEditing, onToggleEdit, onClear, onSave, onUpload, isUploading, showInfoPanel, onToggleInfo }) => {
     const { t, language, setLanguage } = useI18n();
     const { theme, toggleTheme } = useTheme();
 
@@ -95,6 +96,15 @@ export const TopBar = ({ currentPath, onOpenFolder, isEditing, onToggleEdit, onC
                 </Button>
                 <Button variant="ghost" className={`h-9 w-9 p-0 rounded-lg hover:bg-black/10 dark:hover:bg-white/5 ${theme === 'dark' ? 'text-white/70' : 'text-gray-600'}`} onClick={onSave}>
                     <Download size={18} className="hover:text-primary transition-colors" />
+                </Button>
+                <Button
+                    variant="ghost"
+                    className={`h-9 w-9 p-0 rounded-lg hover:bg-black/10 dark:hover:bg-white/5 ${theme === 'dark' ? 'text-white/70' : 'text-gray-600'} ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    onClick={onUpload}
+                    disabled={isUploading}
+                    title={t('upload')}
+                >
+                    <Upload size={18} className={`hover:text-primary transition-colors ${isUploading ? 'animate-pulse' : ''}`} />
                 </Button>
             </div>
         </motion.div>

@@ -61,5 +61,10 @@
   "saveSuccess": "儲存成功！",
   "batchSuccess": "批量裁切完成！已儲存 {count} 張圖片。",
   "lightMode": "切換至淺色模式",
-  "darkMode": "切換至深色模式"
+  "darkMode": "切換至深色模式",
+  "upload": "上傳到雲端",
+  "uploading": "上傳中...",
+  "uploadSuccess": "上傳成功！網址已複製到剪貼簿",
+  "uploadFailed": "上傳失敗：{error}",
+  "noImageToUpload": "沒有圖片可上傳"
 }

@@ -61,5 +61,10 @@
   "saveSuccess": "Saved successfully!",
   "batchSuccess": "Batch crop completed! {count} images saved.",
   "lightMode": "Switch to Light Mode",
-  "darkMode": "Switch to Dark Mode"
+  "darkMode": "Switch to Dark Mode",
+  "upload": "Upload to Cloud",
+  "uploading": "Uploading...",
+  "uploadSuccess": "Uploaded! URL copied to clipboard",
+  "uploadFailed": "Upload failed: {error}",
+  "noImageToUpload": "No image to upload"
 }
