@@ -526,6 +526,8 @@ function App() {
         onToggleViewMode={() => setViewMode(viewMode === 'local' ? 'album' : 'local')}
         selectedAlbum={selectedAlbum}
         onAddAlbumImage={(url) => selectedAlbumId && addAlbumImage(selectedAlbumId, url)}
+        albumSidebarCollapsed={albumSidebarCollapsed}
+        onToggleAlbumSidebar={() => setAlbumSidebarCollapsed(!albumSidebarCollapsed)}
       />
 
       {/* 2. Main Content Area */}

@@ -21,7 +21,15 @@ import { useTheme } from '../../contexts/ThemeContext';
 // Check if electronAPI is available (injected via preload script)
 const electronAPI = window.electronAPI || null;
 
-export const TopBar = ({ currentPath, onOpenFolder, isEditing, onToggleEdit, onClear, onSave, onUpload, isUploading, uploadHistoryCount, onToggleUploadHistory, showInfoPanel, onToggleInfo, viewMode, onToggleViewMode, selectedAlbum, onAddAlbumImage }) => {
+// Sidebar toggle icon
+const PanelLeft = ({ size = 24, className = '' }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <rect width="18" height="18" x="3" y="3" rx="2" />
+        <path d="M9 3v18" />
+    </svg>
+);
+
+export const TopBar = ({ currentPath, onOpenFolder, isEditing, onToggleEdit, onClear, onSave, onUpload, isUploading, uploadHistoryCount, onToggleUploadHistory, showInfoPanel, onToggleInfo, viewMode, onToggleViewMode, selectedAlbum, onAddAlbumImage, albumSidebarCollapsed, onToggleAlbumSidebar }) => {
     const { t, language, setLanguage } = useI18n();
     const { theme, toggleTheme } = useTheme();
     const [urlInput, setUrlInput] = useState('');
@@ -77,6 +85,23 @@ export const TopBar = ({ currentPath, onOpenFolder, isEditing, onToggleEdit, onC
         >
             {/* Left: Folder/Album Info */}
             <div className="flex items-center gap-2">
+                {/* Album sidebar toggle - only in album mode */}
+                {viewMode === 'album' && (
+                    <button
+                        onClick={onToggleAlbumSidebar}
+                        className={`p-2 rounded-lg transition-all ${
+                            albumSidebarCollapsed
+                                ? 'bg-primary/20 text-primary'
+                                : theme === 'dark'
+                                    ? 'hover:bg-white/10 text-white/60'
+                                    : 'hover:bg-black/10 text-gray-500'
+                        }`}
+                        title={albumSidebarCollapsed ? t('expandSidebar') : t('collapseSidebar')}
+                    >
+                        <PanelLeft size={18} />
+                    </button>
+                )}
+
                 <div
                     className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all border ${
                         viewMode === 'album' ? '' : 'cursor-pointer'

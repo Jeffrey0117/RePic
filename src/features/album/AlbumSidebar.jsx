@@ -4,13 +4,6 @@ import { FolderOpen, Trash2, X, Check } from '../../components/icons';
 import { useTheme } from '../../contexts/ThemeContext';
 import useI18n from '../../hooks/useI18n';
 
-// Chevron icon for collapse toggle
-const ChevronLeft = ({ size = 24, className = '' }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-    <path d="m15 18-6-6 6-6" />
-  </svg>
-);
-
 export const AlbumSidebar = ({
   albums,
   selectedAlbumId,
@@ -67,12 +60,13 @@ export const AlbumSidebar = ({
     }
   };
 
-  const sidebarWidth = isCollapsed ? 40 : 250;
+  // When collapsed, width is 0 (completely hidden)
+  const sidebarWidth = isCollapsed ? 0 : 220;
 
   return (
     <motion.aside
-      initial={{ width: 250, opacity: 0 }}
-      animate={{ width: sidebarWidth, opacity: 1 }}
+      initial={{ width: 220, opacity: 0 }}
+      animate={{ width: sidebarWidth, opacity: isCollapsed ? 0 : 1 }}
       transition={{ duration: 0.2, ease: 'easeInOut' }}
       className={`h-full border-r flex flex-col overflow-hidden ${
         theme === 'dark'
@@ -80,27 +74,11 @@ export const AlbumSidebar = ({
           : 'bg-gray-50 border-gray-200'
       }`}
     >
-      {/* Header with collapse toggle */}
-      <div className={`flex items-center justify-between p-2 border-b ${theme === 'dark' ? 'border-white/5' : 'border-gray-200'}`}>
-        {!isCollapsed && (
-          <h2 className={`text-sm font-semibold px-2 ${theme === 'dark' ? 'text-white/80' : 'text-gray-700'}`}>
-            {t('webAlbums')}
-          </h2>
-        )}
-        <button
-          onClick={onToggleCollapse}
-          className={`p-1.5 rounded-lg transition-all ${
-            theme === 'dark'
-              ? 'hover:bg-white/10 text-white/60'
-              : 'hover:bg-black/10 text-gray-500'
-          }`}
-          title={isCollapsed ? t('expandSidebar') : t('collapseSidebar')}
-        >
-          <ChevronLeft
-            size={18}
-            className={`transition-transform duration-200 ${isCollapsed ? 'rotate-180' : ''}`}
-          />
-        </button>
+      {/* Header */}
+      <div className={`flex items-center justify-between p-3 border-b ${theme === 'dark' ? 'border-white/5' : 'border-gray-200'}`}>
+        <h2 className={`text-sm font-semibold ${theme === 'dark' ? 'text-white/80' : 'text-gray-700'}`}>
+          {t('webAlbums')}
+        </h2>
       </div>
 
       {/* Album List - hidden when collapsed */}
