@@ -8,6 +8,7 @@ import { TopBar } from './components/ui/TopBar';
 import { SaveToolbar } from './components/ui/SaveToolbar';
 import { Toast } from './components/ui/Toast';
 import { UploadHistoryPanel } from './components/ui/UploadHistoryPanel';
+import { ExportVirtualDialog } from './components/ui/ExportVirtualDialog';
 import { AlbumSidebar } from './features/album/AlbumSidebar';
 import { useFileSystem } from './hooks/useFileSystem';
 import { useWebAlbums } from './hooks/useWebAlbums';
@@ -76,6 +77,9 @@ function App() {
   // Album sidebar collapsed state
   const [albumSidebarCollapsed, setAlbumSidebarCollapsed] = useState(false);
 
+  // Export dialog state
+  const [showExportDialog, setShowExportDialog] = useState(false);
+
   // Sync file system image with local view only when currentImage or cacheVersion changes
   useEffect(() => {
     if (currentImage) {
@@ -97,6 +101,54 @@ function App() {
       });
     }
   }, [loadFile]);
+
+  // Virtual image state (for opening .repic files directly)
+  const [virtualImageData, setVirtualImageData] = useState(null);
+  const [virtualSiblings, setVirtualSiblings] = useState([]);
+  const [virtualIndex, setVirtualIndex] = useState(0);
+
+  // Listen for virtual image open events (.repic files)
+  useEffect(() => {
+    const electronAPI = getElectronAPI();
+    if (electronAPI?.onOpenVirtualImage) {
+      electronAPI.onOpenVirtualImage((data) => {
+        console.log('[App] Received virtual image:', data);
+        setVirtualImageData(data);
+        setVirtualSiblings(data.siblingFiles || []);
+        // Find current index in siblings
+        const idx = (data.siblingFiles || []).findIndex(f => f === data.filePath);
+        setVirtualIndex(idx >= 0 ? idx : 0);
+        // Switch to a special virtual mode (use 'virtual' view mode)
+        setViewMode('virtual');
+      });
+    }
+  }, []);
+
+  // Virtual image navigation
+  const navigateVirtual = useCallback(async (newIndex) => {
+    if (newIndex < 0 || newIndex >= virtualSiblings.length) return;
+    const electronAPI = getElectronAPI();
+    if (!electronAPI) return;
+
+    const filePath = virtualSiblings[newIndex];
+    const result = await electronAPI.readRepicFile(filePath);
+    if (result.success && result.data) {
+      setVirtualImageData({
+        ...result.data,
+        filePath,
+        folderPath: electronAPI.path.dirname(filePath)
+      });
+      setVirtualIndex(newIndex);
+    }
+  }, [virtualSiblings]);
+
+  const nextVirtualImage = useCallback(() => {
+    navigateVirtual(virtualIndex + 1);
+  }, [navigateVirtual, virtualIndex]);
+
+  const prevVirtualImage = useCallback(() => {
+    navigateVirtual(virtualIndex - 1);
+  }, [navigateVirtual, virtualIndex]);
 
   const handleOpenFile = async () => {
     const electronAPI = getElectronAPI();
@@ -493,7 +545,14 @@ function App() {
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (isEditing) return;
-      if (viewMode === 'album') {
+      if (viewMode === 'virtual') {
+        if (e.key === 'ArrowRight') nextVirtualImage();
+        if (e.key === 'ArrowLeft') prevVirtualImage();
+        if (e.key === 'Escape') {
+          setViewMode('local');
+          setVirtualImageData(null);
+        }
+      } else if (viewMode === 'album') {
         if (e.key === 'ArrowRight') nextAlbumImage();
         if (e.key === 'ArrowLeft') prevAlbumImage();
       } else {
@@ -503,7 +562,7 @@ function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isEditing, viewMode, nextImage, prevImage, nextAlbumImage, prevAlbumImage]);
+  }, [isEditing, viewMode, nextImage, prevImage, nextAlbumImage, prevAlbumImage, nextVirtualImage, prevVirtualImage]);
 
   return (
     <div className="h-screen w-screen bg-[#0A0A0A] text-white overflow-hidden flex flex-col select-none">
@@ -528,6 +587,7 @@ function App() {
         onAddAlbumImage={(url) => selectedAlbumId && addAlbumImage(selectedAlbumId, url)}
         albumSidebarCollapsed={albumSidebarCollapsed}
         onToggleAlbumSidebar={() => setAlbumSidebarCollapsed(!albumSidebarCollapsed)}
+        onExportVirtual={() => setShowExportDialog(true)}
       />
 
       {/* 2. Main Content Area */}
@@ -557,7 +617,33 @@ function App() {
         {/* Center: Main Viewport */}
         <main className="flex-1 min-w-0 relative main-viewport-bg overflow-hidden transition-all duration-250">
           <AnimatePresence mode="wait">
-            {viewMode === 'album' ? (
+            {viewMode === 'virtual' ? (
+              // Virtual image mode (opened from .repic file)
+              virtualImageData ? (
+                <motion.div
+                  key="virtual-viewer"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 z-10 bg-[#0f0f0f]"
+                >
+                  <div className="w-full h-full p-4">
+                    <ImageViewer src={virtualImageData.url} />
+                  </div>
+                  {/* Navigation info */}
+                  <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 px-4 py-2 rounded-lg text-white/80 text-sm">
+                    {virtualImageData.name || 'Virtual Image'} ({virtualIndex + 1}/{virtualSiblings.length})
+                  </div>
+                  {/* Close button */}
+                  <button
+                    onClick={() => { setViewMode('local'); setVirtualImageData(null); }}
+                    className="absolute top-4 right-4 bg-black/60 hover:bg-black/80 text-white p-2 rounded-lg"
+                  >
+                    ESC
+                  </button>
+                </motion.div>
+              ) : null
+            ) : viewMode === 'album' ? (
               // Album mode
               currentAlbumImage ? (
                 <motion.div
@@ -692,6 +778,16 @@ function App() {
           onConfirm={handleBatchCropConfirm}
         />
       </Suspense>
+
+      {/* Export Virtual Images Dialog */}
+      <ExportVirtualDialog
+        isOpen={showExportDialog}
+        onClose={() => setShowExportDialog(false)}
+        album={selectedAlbum}
+        onExportComplete={(count) => {
+          setToast({ visible: true, message: t('exportSuccess', { count }) });
+        }}
+      />
 
     </div>
   );

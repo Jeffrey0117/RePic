@@ -90,5 +90,18 @@
   "imageUrl": "URL",
   "addedDate": "Added",
   "imageIndex": "Position",
-  "noImageSelected": "No image selected"
+  "noImageSelected": "No image selected",
+  "exportVirtual": "Export Shortcuts",
+  "exportVirtualTitle": "Export Virtual Image Shortcuts",
+  "targetFolder": "Target Folder",
+  "browse": "Browse...",
+  "filenameFormat": "Filename Format",
+  "useImageName": "Use image name",
+  "useNumberedName": "Add sequence number",
+  "exporting": "Exporting...",
+  "exportSuccess": "Exported {count} shortcuts",
+  "exportFailed": "Export failed: {error}",
+  "virtualImage": "Virtual Image",
+  "loadingImage": "Loading image...",
+  "networkRequired": "Network connection required"
 }

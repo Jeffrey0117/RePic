@@ -90,5 +90,18 @@
   "imageUrl": "網址",
   "addedDate": "加入時間",
   "imageIndex": "位置",
-  "noImageSelected": "未選擇圖片"
+  "noImageSelected": "未選擇圖片",
+  "exportVirtual": "匯出捷徑",
+  "exportVirtualTitle": "匯出虛擬圖片捷徑",
+  "targetFolder": "目標資料夾",
+  "browse": "瀏覽...",
+  "filenameFormat": "檔名格式",
+  "useImageName": "使用圖片名稱",
+  "useNumberedName": "加上序號",
+  "exporting": "匯出中...",
+  "exportSuccess": "已匯出 {count} 個捷徑",
+  "exportFailed": "匯出失敗：{error}",
+  "virtualImage": "虛擬圖片",
+  "loadingImage": "載入圖片中...",
+  "networkRequired": "需要網路連線"
 }

@@ -86,6 +86,14 @@
         "mimeType": "image/bmp",
         "role": "Viewer",
         "icon": "repic-logo.png"
+      },
+      {
+        "ext": "repic",
+        "name": "Repic Virtual Image",
+        "description": "Repic Virtual Image File",
+        "mimeType": "application/x-repic",
+        "role": "Viewer",
+        "icon": "repic-logo.png"
       }
     ],
     "win": {

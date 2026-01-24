@@ -19,16 +19,21 @@ if (!gotTheLock) {
 } else {
     // Handle second instance (when user opens another file while app is running)
     app.on('second-instance', (_event, commandLine) => {
-        // Find image file from command line args
+        // Find image or .repic file from command line args
         const filePath = commandLine.find(arg => {
             if (arg.startsWith('-') || arg.startsWith('--')) return false;
             const ext = path.extname(arg).toLowerCase();
-            return ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'].includes(ext);
+            return ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.repic'].includes(ext);
         });
 
         if (filePath && mainWindow) {
-            // Send file to renderer
-            mainWindow.webContents.send('open-file', filePath);
+            // Check if it's a .repic virtual image file
+            if (filePath.toLowerCase().endsWith('.repic')) {
+                handleRepicFile(filePath);
+            } else {
+                // Send file to renderer
+                mainWindow.webContents.send('open-file', filePath);
+            }
             // Focus the window
             if (mainWindow.isMinimized()) mainWindow.restore();
             mainWindow.focus();
@@ -42,8 +47,40 @@ function getFileFromArgs() {
     return args.find(arg => {
         if (arg.startsWith('-') || arg.startsWith('--')) return false;
         const ext = path.extname(arg).toLowerCase();
-        return ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'].includes(ext);
+        return ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.repic'].includes(ext);
     });
+}
+
+// Handle .repic virtual image file
+async function handleRepicFile(filePath) {
+    try {
+        const content = fs.readFileSync(filePath, 'utf-8');
+        const data = JSON.parse(content);
+
+        // Validate .repic file format
+        if (data.type !== 'virtual-image' || !data.url) {
+            console.error('Invalid .repic file format');
+            return;
+        }
+
+        // Get all .repic files in the same folder for navigation
+        const folderPath = path.dirname(filePath);
+        const allRepicFiles = fs.readdirSync(folderPath)
+            .filter(f => f.toLowerCase().endsWith('.repic'))
+            .map(f => path.join(folderPath, f));
+
+        // Send to renderer
+        if (mainWindow) {
+            mainWindow.webContents.send('open-virtual-image', {
+                ...data,
+                filePath,
+                folderPath,
+                siblingFiles: allRepicFiles
+            });
+        }
+    } catch (e) {
+        console.error('Failed to handle .repic file:', e);
+    }
 }
 
 // Input validation helpers
@@ -93,7 +130,12 @@ function createWindow() {
     // Send file to open when renderer is ready
     mainWindow.webContents.once('did-finish-load', () => {
         if (fileToOpen) {
-            mainWindow.webContents.send('open-file', fileToOpen);
+            // Check if it's a .repic virtual image file
+            if (fileToOpen.toLowerCase().endsWith('.repic')) {
+                handleRepicFile(fileToOpen);
+            } else {
+                mainWindow.webContents.send('open-file', fileToOpen);
+            }
             fileToOpen = null;
         }
     });
@@ -184,6 +226,61 @@ function setupIpcHandlers() {
     // Check if native processing is available
     ipcMain.handle('native-available', () => {
         return { available: false };
+    });
+
+    // Read .repic file
+    ipcMain.handle('read-repic-file', async (event, filePath) => {
+        if (!isValidPath(filePath)) {
+            return { success: false, error: 'Invalid file path' };
+        }
+        try {
+            const content = fs.readFileSync(filePath, 'utf-8');
+            const data = JSON.parse(content);
+            return { success: true, data };
+        } catch (e) {
+            console.error('Failed to read .repic file:', e);
+            return { success: false, error: e.message };
+        }
+    });
+
+    // Write .repic file
+    ipcMain.handle('write-repic-file', async (event, filePath, data) => {
+        if (!isValidPath(filePath)) {
+            return { success: false, error: 'Invalid file path' };
+        }
+        try {
+            const content = JSON.stringify(data, null, 2);
+            fs.writeFileSync(filePath, content, 'utf-8');
+            return { success: true };
+        } catch (e) {
+            console.error('Failed to write .repic file:', e);
+            return { success: false, error: e.message };
+        }
+    });
+
+    // Write multiple .repic files (batch export)
+    ipcMain.handle('write-repic-files-batch', async (event, { folderPath, files }) => {
+        if (!isValidPath(folderPath)) {
+            return { success: false, error: 'Invalid folder path' };
+        }
+        try {
+            // Ensure folder exists
+            if (!fs.existsSync(folderPath)) {
+                fs.mkdirSync(folderPath, { recursive: true });
+            }
+
+            const results = [];
+            for (const file of files) {
+                const filePath = path.join(folderPath, file.filename);
+                const content = JSON.stringify(file.data, null, 2);
+                fs.writeFileSync(filePath, content, 'utf-8');
+                results.push({ filename: file.filename, success: true });
+            }
+            return { success: true, count: results.length };
+        } catch (e) {
+            console.error('Failed to write .repic files:', e);
+            return { success: false, error: e.message };
+        }
     });
 
     // Batch crop - save cropped image data to file

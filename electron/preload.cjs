@@ -25,6 +25,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
         ipcRenderer.on('open-file', (_event, filePath) => callback(filePath));
     },
 
+    // Listen for virtual image open events (.repic files)
+    onOpenVirtualImage: (callback) => {
+        ipcRenderer.on('open-virtual-image', (_event, data) => callback(data));
+    },
+
     // Directory selection dialog
     selectDirectory: async () => {
         return await ipcRenderer.invoke('select-directory');
@@ -78,14 +83,30 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return await ipcRenderer.invoke('get-file-info', filePath);
     },
 
-    // Read file as data URL (for images)
+    // Read file as data URL (for images) or parse .repic files
     readFile: (filePath) => {
         if (!isValidPath(filePath)) {
             return null;
         }
         try {
-            const buffer = fs.readFileSync(filePath);
             const ext = path.extname(filePath).toLowerCase();
+
+            // Handle .repic virtual image files
+            if (ext === '.repic') {
+                const content = fs.readFileSync(filePath, 'utf-8');
+                const data = JSON.parse(content);
+                return {
+                    type: 'virtual',
+                    url: data.url,
+                    name: data.name,
+                    albumId: data.albumId,
+                    imageId: data.imageId,
+                    filePath
+                };
+            }
+
+            // Handle regular image files
+            const buffer = fs.readFileSync(filePath);
             const mimeTypes = {
                 '.jpg': 'image/jpeg',
                 '.jpeg': 'image/jpeg',
@@ -102,8 +123,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
     },
 
-    // Get files in directory
-    getFilesInDirectory: (dirPath, extensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp']) => {
+    // Get files in directory (includes .repic virtual images)
+    getFilesInDirectory: (dirPath, extensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.repic']) => {
         if (!isValidPath(dirPath)) {
             return [];
         }
@@ -158,5 +179,29 @@ contextBridge.exposeInMainWorld('electronAPI', {
     isNativeAvailable: async () => {
         const result = await ipcRenderer.invoke('native-available');
         return result.available;
+    },
+
+    // Read .repic virtual image file
+    readRepicFile: async (filePath) => {
+        if (!isValidPath(filePath)) {
+            return { success: false, error: 'Invalid file path' };
+        }
+        return await ipcRenderer.invoke('read-repic-file', filePath);
+    },
+
+    // Write .repic virtual image file
+    writeRepicFile: async (filePath, data) => {
+        if (!isValidPath(filePath)) {
+            return { success: false, error: 'Invalid file path' };
+        }
+        return await ipcRenderer.invoke('write-repic-file', filePath, data);
+    },
+
+    // Batch export .repic files
+    writeRepicFilesBatch: async (folderPath, files) => {
+        if (!isValidPath(folderPath)) {
+            return { success: false, error: 'Invalid folder path' };
+        }
+        return await ipcRenderer.invoke('write-repic-files-batch', { folderPath, files });
     }
 });
