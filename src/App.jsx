@@ -7,6 +7,7 @@ import { InfoPanel } from './components/ui/InfoPanel';
 import { TopBar } from './components/ui/TopBar';
 import { SaveToolbar } from './components/ui/SaveToolbar';
 import { Toast } from './components/ui/Toast';
+import { UploadHistoryPanel } from './components/ui/UploadHistoryPanel';
 import { useFileSystem } from './hooks/useFileSystem';
 import useI18n from './hooks/useI18n';
 
@@ -48,6 +49,8 @@ function App() {
 
   // Upload state
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadHistory, setUploadHistory] = useState([]);
+  const [showUploadHistory, setShowUploadHistory] = useState(false);
 
   // Sync file system image with local view only when currentImage or cacheVersion changes
   useEffect(() => {
@@ -297,12 +300,14 @@ function App() {
     }
 
     setIsUploading(true);
+    console.log('[handleUpload] Starting upload, localImage:', localImage.substring(0, 50));
 
     try {
       // Convert image to blob
       let blob;
       if (localImage.startsWith('data:')) {
         // Base64 data URL
+        console.log('[handleUpload] Converting data URL to blob');
         const response = await fetch(localImage);
         blob = await response.blob();
       } else if (localImage.startsWith('file://')) {
@@ -310,6 +315,7 @@ function App() {
         const electronAPI = getElectronAPI();
         if (electronAPI) {
           const cleanPath = localImage.replace('file://', '').split('?')[0];
+          console.log('[handleUpload] Reading file:', cleanPath);
           const dataUrl = electronAPI.readFile(cleanPath);
           if (dataUrl) {
             const response = await fetch(dataUrl);
@@ -322,9 +328,14 @@ function App() {
         throw new Error('Failed to read image');
       }
 
+      console.log('[handleUpload] Blob created, size:', blob.size, 'type:', blob.type);
+
       // Create form data
       const formData = new FormData();
-      formData.append('file', blob, `repic-${Date.now()}.png`);
+      const filename = `repic-${Date.now()}.${blob.type.split('/')[1] || 'png'}`;
+      formData.append('file', blob, filename);
+
+      console.log('[handleUpload] Uploading to urusai.cc...');
 
       // Upload to urusai.cc
       const response = await fetch('https://api.urusai.cc/v1/upload', {
@@ -332,17 +343,50 @@ function App() {
         body: formData
       });
 
-      const result = await response.json();
+      console.log('[handleUpload] Response status:', response.status);
+      const responseText = await response.text();
+      console.log('[handleUpload] Response text:', responseText);
 
-      if (result.url || result.direct) {
-        const imageUrl = result.direct || result.url;
-        // Copy URL to clipboard
-        await navigator.clipboard.writeText(imageUrl);
-        setToast({ visible: true, message: t('uploadSuccess') });
+      let result;
+      try {
+        result = JSON.parse(responseText);
+      } catch {
+        throw new Error(`Invalid response: ${responseText.substring(0, 100)}`);
+      }
+
+      console.log('[handleUpload] Parsed result:', result);
+
+      // urusai.cc 回傳格式: { status, message, data: { id, url_preview, url_direct, ... } }
+      if (result.status === 'success' && result.data) {
+        // 優先使用 url_direct，其次 url_preview
+        const imageUrl = result.data.url_direct || result.data.url_preview || `https://i.urusai.cc/${result.data.id}`;
+
+        // 儲存到上傳歷史
+        const newUpload = {
+          id: result.data.id,
+          url: imageUrl,
+          timestamp: Date.now(),
+          filename: result.data.filename || `repic-${Date.now()}`
+        };
+        setUploadHistory(prev => [newUpload, ...prev].slice(0, 50)); // 最多保留 50 筆
+
+        // 嘗試複製到剪貼簿，失敗則用 prompt
+        try {
+          await navigator.clipboard.writeText(imageUrl);
+          setToast({ visible: true, message: t('uploadSuccess') });
+        } catch {
+          // Clipboard API 失敗，用 prompt 讓用戶手動複製
+          prompt(t('uploadSuccessManualCopy'), imageUrl);
+        }
+
+        console.log('[handleUpload] Success! URL:', imageUrl);
+      } else if (result.error || (result.status && result.status !== 'success')) {
+        throw new Error(result.error || result.message || 'Upload failed');
       } else {
-        throw new Error(result.error || 'Unknown error');
+        throw new Error('No data in response');
       }
     } catch (error) {
+      console.error('[handleUpload] Error:', error);
       setToast({ visible: true, message: t('uploadFailed', { error: error.message }) });
     } finally {
       setIsUploading(false);
@@ -373,6 +417,8 @@ function App() {
         onSave={handleSave}
         onUpload={handleUpload}
         isUploading={isUploading}
+        uploadHistoryCount={uploadHistory.length}
+        onToggleUploadHistory={() => setShowUploadHistory(!showUploadHistory)}
         showInfoPanel={showInfoPanel}
         onToggleInfo={() => setShowInfoPanel(!showInfoPanel)}
       />
@@ -468,6 +514,14 @@ function App() {
           onHide={() => setToast({ visible: false, message: '' })}
         />
       </AnimatePresence>
+
+      {/* Upload History Panel */}
+      <UploadHistoryPanel
+        isVisible={showUploadHistory}
+        history={uploadHistory}
+        onClose={() => setShowUploadHistory(false)}
+        onClear={() => setUploadHistory([])}
+      />
 
       {/* Batch Crop Modal */}
       <Suspense fallback={null}>

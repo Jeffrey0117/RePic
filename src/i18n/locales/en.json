@@ -65,6 +65,10 @@
   "upload": "Upload to Cloud",
   "uploading": "Uploading...",
   "uploadSuccess": "Uploaded! URL copied to clipboard",
+  "uploadSuccessManualCopy": "Upload success! Copy the URL:",
   "uploadFailed": "Upload failed: {error}",
-  "noImageToUpload": "No image to upload"
+  "noImageToUpload": "No image to upload",
+  "uploadHistory": "Upload History",
+  "noUploadHistory": "No uploads yet",
+  "copied": "Copied!"
 }

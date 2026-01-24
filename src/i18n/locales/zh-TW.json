@@ -65,6 +65,10 @@
   "upload": "上傳到雲端",
   "uploading": "上傳中...",
   "uploadSuccess": "上傳成功！網址已複製到剪貼簿",
+  "uploadSuccessManualCopy": "上傳成功！複製網址：",
   "uploadFailed": "上傳失敗：{error}",
-  "noImageToUpload": "沒有圖片可上傳"
+  "noImageToUpload": "沒有圖片可上傳",
+  "uploadHistory": "上傳歷史",
+  "noUploadHistory": "尚無上傳紀錄",
+  "copied": "已複製！"
 }

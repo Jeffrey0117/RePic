@@ -97,6 +97,13 @@ function createWindow() {
             fileToOpen = null;
         }
     });
+
+    // F12 to toggle DevTools
+    mainWindow.webContents.on('before-input-event', (event, input) => {
+        if (input.key === 'F12') {
+            mainWindow.webContents.toggleDevTools();
+        }
+    });
 }
 
 function setupIpcHandlers() {
