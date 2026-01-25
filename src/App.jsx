@@ -663,39 +663,51 @@ function App() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="absolute inset-4 flex flex-col items-center justify-center"
+                  className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-black/20 to-black/40"
                 >
-                  <p className="text-lg text-white/40">{selectedAlbum ? t('emptyAlbum') : t('selectOrCreateAlbum')}</p>
-                  {selectedAlbum && (
-                    <>
-                      <p className="text-sm mt-2 text-white/40">{t('pasteUrlHint')}</p>
-                      <div className="mt-6 w-full max-w-md">
-                        <input
-                          type="text"
-                          placeholder={t('pasteImageUrl')}
-                          className="w-full px-4 py-3 text-sm rounded-xl bg-white/5 text-white border border-white/10 placeholder:text-white/30 focus:border-primary/50 focus:outline-none"
-                          onPaste={(e) => {
-                            const text = e.clipboardData.getData('text');
-                            if (text) {
-                              const urls = text.split(/[\n,]/).map(u => u.trim()).filter(Boolean);
-                              if (urls.length > 0 && urls.every(url => url.startsWith('http'))) {
-                                e.preventDefault();
-                                urls.forEach(url => selectedAlbumId && addAlbumImage(selectedAlbumId, url));
+                  <div className="flex flex-col items-center max-w-md px-8">
+                    {/* Icon */}
+                    <div className="w-20 h-20 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-6">
+                      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-white/30">
+                        <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+                        <circle cx="9" cy="9" r="2" />
+                        <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+                      </svg>
+                    </div>
+
+                    <p className="text-xl font-medium text-white/60">{selectedAlbum ? t('emptyAlbum') : t('selectOrCreateAlbum')}</p>
+
+                    {selectedAlbum && (
+                      <>
+                        <p className="text-sm mt-2 text-white/40">{t('pasteUrlHint')}</p>
+                        <div className="mt-6 w-full">
+                          <input
+                            type="text"
+                            placeholder={t('pasteImageUrl')}
+                            className="w-full px-4 py-3 text-sm rounded-xl bg-white/5 text-white border border-white/10 placeholder:text-white/30 focus:border-primary/50 focus:outline-none backdrop-blur-sm"
+                            onPaste={(e) => {
+                              const text = e.clipboardData.getData('text');
+                              if (text) {
+                                const urls = text.split(/[\n,]/).map(u => u.trim()).filter(Boolean);
+                                if (urls.length > 0 && urls.every(url => url.startsWith('http'))) {
+                                  e.preventDefault();
+                                  urls.forEach(url => selectedAlbumId && addAlbumImage(selectedAlbumId, url));
+                                }
                               }
-                            }
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && e.target.value.trim()) {
-                              const urls = e.target.value.split(/[\n,]/).map(u => u.trim()).filter(Boolean);
-                              urls.forEach(url => selectedAlbumId && addAlbumImage(selectedAlbumId, url));
-                              e.target.value = '';
-                            }
-                          }}
-                        />
-                        <p className="text-xs text-white/30 mt-2 text-center">{t('pasteOrEnter')}</p>
-                      </div>
-                    </>
-                  )}
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && e.target.value.trim()) {
+                                const urls = e.target.value.split(/[\n,]/).map(u => u.trim()).filter(Boolean);
+                                urls.forEach(url => selectedAlbumId && addAlbumImage(selectedAlbumId, url));
+                                e.target.value = '';
+                              }
+                            }}
+                          />
+                          <p className="text-xs text-white/30 mt-2 text-center">{t('pasteOrEnter')}</p>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </motion.div>
               )
             ) : (
