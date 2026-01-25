@@ -101,6 +101,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
                     name: data.name,
                     albumId: data.albumId,
                     imageId: data.imageId,
+                    crop: data.crop || null,
                     filePath
                 };
             }

@@ -42,11 +42,8 @@ export const ImageCropper = ({ imageSrc, onCancel, onComplete, fileCount = 1, on
     };
 
     const handleSave = async () => {
-        console.log('[ImageCropper] handleSave', { completedCrop, imgRef: imgRef.current, isVirtual });
-
         // For virtual images, return crop parameters instead of generating image
         if (isVirtual && crop) {
-            console.log('[ImageCropper] Virtual mode - returning crop params:', crop);
             onComplete({
                 type: 'crop-params',
                 crop: {
@@ -69,13 +66,11 @@ export const ImageCropper = ({ imageSrc, onCancel, onComplete, fileCount = 1, on
                     1,  // scale
                     annotations
                 );
-                console.log('[ImageCropper] croppedImage generated', croppedImage?.substring(0, 50));
                 onComplete(croppedImage);
             } catch (e) {
                 console.error('[ImageCropper] getCroppedImg error:', e);
             }
         } else {
-            console.log('[ImageCropper] no crop, returning original');
             onComplete(imageSrc);
         }
     };

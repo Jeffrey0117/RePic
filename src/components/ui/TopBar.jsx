@@ -31,7 +31,7 @@ const PanelLeft = ({ size = 24, className = '' }) => (
     </svg>
 );
 
-export const TopBar = ({ currentPath, onOpenFolder, isEditing, onToggleEdit, onClear, onSave, onCopy, isCopying, onUpload, isUploading, uploadHistoryCount, onToggleUploadHistory, showInfoPanel, onToggleInfo, viewMode, onToggleViewMode, selectedAlbum, onAddAlbumImage, albumSidebarCollapsed, onToggleAlbumSidebar, onExportVirtual, hasImage }) => {
+export const TopBar = ({ currentPath, onOpenFolder, onRefresh, isEditing, onToggleEdit, onClear, onSave, onCopy, isCopying, onUpload, isUploading, uploadHistoryCount, onToggleUploadHistory, showInfoPanel, onToggleInfo, viewMode, onToggleViewMode, selectedAlbum, onAddAlbumImage, albumSidebarCollapsed, onToggleAlbumSidebar, onExportVirtual, hasImage }) => {
     const { t, language, setLanguage } = useI18n();
     const { theme, toggleTheme } = useTheme();
     const [urlInput, setUrlInput] = useState('');
@@ -152,7 +152,7 @@ export const TopBar = ({ currentPath, onOpenFolder, isEditing, onToggleEdit, onC
             <div className={`flex items-center rounded-xl p-1 border ${theme === 'dark' ? 'bg-black/20 border-white/5' : 'bg-black/5 border-black/10'}`}>
                 <ToolButton icon={Album} title={t('webAlbum')} onClick={onToggleViewMode} active={viewMode === 'album'} theme={theme} />
                 <div className={`w-px h-6 mx-1 ${theme === 'dark' ? 'bg-white/10' : 'bg-black/10'}`} />
-                <ToolButton icon={RotateCcw} title={t('refresh')} onClick={() => window.location.reload()} theme={theme} />
+                <ToolButton icon={RotateCcw} title={t('refresh')} onClick={onRefresh} theme={theme} />
                 <ToolButton icon={Scissors} title={t('editArea')} onClick={onToggleEdit} active={isEditing} disabled={!hasImage} theme={theme} />
                 <ToolButton icon={Copy} title={t('copyToClipboard')} onClick={onCopy} disabled={isCopying || !hasImage} loading={isCopying} theme={theme} />
                 <ToolButton icon={Upload} title={t('upload')} onClick={onUpload} disabled={isUploading || viewMode === 'album'} loading={isUploading} theme={theme} />

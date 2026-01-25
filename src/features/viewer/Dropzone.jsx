@@ -1,4 +1,4 @@
-import { ImageIcon, FolderOpen } from '../../components/icons';
+import { FolderOpen } from '../../components/icons';
 import { Button } from '../../components/ui/Button';
 import useI18n from '../../hooks/useI18n';
 
@@ -6,29 +6,15 @@ export const Dropzone = ({ onOpenFolder }) => {
     const { t } = useI18n();
 
     return (
-        <div className="text-center p-10 rounded-3xl bg-surface/50 max-w-md w-full mx-4">
-            <div className="flex flex-col items-center gap-4">
-                <div className="p-4 bg-zinc-800 rounded-full text-zinc-400">
-                    <ImageIcon size={48} />
-                </div>
-                <div className="space-y-1">
-                    <h2 className="text-xl font-semibold text-white">Repic</h2>
-                    <p className="text-text-secondary text-sm">
-                        {t('selectFolderHint')}
-                    </p>
-                </div>
-            </div>
-
-            <div className="mt-6">
-                <Button
-                    variant="primary"
-                    icon={FolderOpen}
-                    className="w-full justify-center"
-                    onClick={onOpenFolder}
-                >
-                    {t('openFolder')}
-                </Button>
-            </div>
+        <div className="flex items-center justify-center h-full">
+            <Button
+                variant="ghost"
+                icon={FolderOpen}
+                className="text-white/40 hover:text-white/60 hover:bg-white/5"
+                onClick={onOpenFolder}
+            >
+                {t('openFolder')}
+            </Button>
         </div>
     );
 };

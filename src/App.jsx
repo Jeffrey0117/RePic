@@ -56,6 +56,7 @@ function App() {
 
   // Local state for edits/UI
   const [localImage, setLocalImage] = useState(null);
+  const [localCrop, setLocalCrop] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [showInfoPanel, setShowInfoPanel] = useState(false);
   const [isModified, setIsModified] = useState(false);
@@ -92,19 +93,28 @@ function App() {
         const electronAPI = getElectronAPI();
         if (electronAPI) {
           const result = electronAPI.readFile(currentImage);
+          console.log('[App] Reading .repic file:', currentImage);
+          console.log('[App] Result:', result);
           if (result && typeof result === 'object' && result.url) {
+            console.log('[App] Setting localImage:', result.url);
+            console.log('[App] Setting localCrop:', result.crop);
             setLocalImage(result.url);
+            setLocalCrop(result.crop || null);
           } else {
+            console.log('[App] No valid URL in result');
             setLocalImage(null);
+            setLocalCrop(null);
           }
         }
       } else {
         setLocalImage(`file://${currentImage}?v=${cacheVersion}`);
+        setLocalCrop(null);
       }
       setIsEditing(false); // Reset editing when switching images
       setIsModified(false); // Reset modified state
     } else {
       setLocalImage(null);
+      setLocalCrop(null);
       setIsModified(false);
     }
   }, [currentImage, cacheVersion]); // Also depend on cacheVersion for refresh after save
@@ -177,14 +187,51 @@ function App() {
     }
   };
 
-  const handleCropComplete = (result) => {
+  // Refresh current view without changing folder
+  const handleRefresh = useCallback(() => {
+    if (viewMode === 'local' && currentPath) {
+      loadFolder(currentPath, true);
+    }
+  }, [viewMode, currentPath, loadFolder]);
+
+  const handleCropComplete = async (result) => {
     // Check if this is a virtual image crop (returns crop params instead of image)
     if (result && typeof result === 'object' && result.type === 'crop-params') {
-      // Virtual image crop - save crop parameters to album
+      // Virtual image crop in album mode - save to localStorage
       if (viewMode === 'album' && selectedAlbumId && albumImages[safeAlbumIndex]) {
         const imageId = albumImages[safeAlbumIndex].id;
         updateImageCrop(selectedAlbumId, imageId, result.crop);
         setToast({ visible: true, message: t('cropSaved') });
+      }
+      // Virtual image crop in local mode (.repic file) - save crop to file
+      else if (viewMode === 'local' && currentImage?.toLowerCase().endsWith('.repic')) {
+        const electronAPI = getElectronAPI();
+        if (electronAPI) {
+          // Read current .repic data
+          const currentData = electronAPI.readFile(currentImage);
+          if (currentData && currentData.url) {
+            // Update with new crop
+            const updatedData = {
+              v: 1,
+              type: 'virtual-image',
+              url: currentData.url,
+              name: currentData.name,
+              albumId: currentData.albumId,
+              imageId: currentData.imageId,
+              crop: result.crop,
+              createdAt: Date.now()
+            };
+            // Write back to file
+            const writeResult = await electronAPI.writeRepicFile(currentImage, updatedData);
+            if (writeResult.success) {
+              setLocalCrop(result.crop);
+              setToast({ visible: true, message: t('cropSaved') });
+            } else {
+              console.error('[handleCropComplete] Failed to save crop:', writeResult.error);
+              setToast({ visible: true, message: t('saveFailed') });
+            }
+          }
+        }
       }
       setIsEditing(false);
       return;
@@ -483,8 +530,10 @@ function App() {
       cropParams = albumImages[safeAlbumIndex]?.crop;
     } else if (viewMode === 'virtual' && virtualImageData?.url) {
       imageSrc = virtualImageData.url;
+      cropParams = virtualImageData.crop;
     } else if (localImage) {
       imageSrc = localImage;
+      cropParams = localCrop;
     }
 
     if (!imageSrc) {
@@ -702,6 +751,7 @@ function App() {
       <TopBar
         currentPath={currentPath}
         onOpenFolder={handleOpenFile}
+        onRefresh={handleRefresh}
         isEditing={isEditing}
         onToggleEdit={() => setIsEditing(!isEditing)}
         onClear={handleClear}
@@ -857,7 +907,7 @@ function App() {
                   className="absolute inset-0 z-10 bg-[#0f0f0f]"
                 >
                   <div className="w-full h-full p-4">
-                    <ImageViewer src={localImage} />
+                    <ImageViewer src={localImage} crop={localCrop} />
                   </div>
                 </motion.div>
               ) : !localImage ? (
@@ -890,8 +940,8 @@ function App() {
                     onCancel={() => setIsEditing(false)}
                     onComplete={handleCropComplete}
                     fileCount={viewMode === 'album' ? albumImages.length : files.length}
-                    onApplyToAll={viewMode === 'local' ? handleApplyToAll : undefined}
-                    isVirtual={viewMode === 'album'}
+                    onApplyToAll={viewMode === 'local' && !currentImage?.toLowerCase().endsWith('.repic') ? handleApplyToAll : undefined}
+                    isVirtual={viewMode === 'album' || (viewMode === 'local' && currentImage?.toLowerCase().endsWith('.repic'))}
                   />
                 </Suspense>
               </motion.div>

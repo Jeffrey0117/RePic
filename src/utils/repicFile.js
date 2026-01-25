@@ -13,10 +13,11 @@ const REPIC_VERSION = 1;
  * @param {string} name - Display name for the image
  * @param {string} albumId - Optional source album ID
  * @param {string} imageId - Optional source image ID
+ * @param {object} crop - Optional crop parameters { x, y, width, height } in percentages
  * @returns {object} .repic file data
  */
-export function createRepicData(url, name, albumId = null, imageId = null) {
-  return {
+export function createRepicData(url, name, albumId = null, imageId = null, crop = null) {
+  const data = {
     v: REPIC_VERSION,
     type: 'virtual-image',
     url,
@@ -25,6 +26,13 @@ export function createRepicData(url, name, albumId = null, imageId = null) {
     imageId,
     createdAt: Date.now()
   };
+
+  // Include crop if present
+  if (crop) {
+    data.crop = crop;
+  }
+
+  return data;
 }
 
 /**
@@ -104,7 +112,8 @@ export function prepareAlbumExport(images, albumId, useIndex = false) {
   return images.map((image, index) => {
     const name = image.name || extractNameFromUrl(image.url);
     const filename = generateRepicFilename(name, index, useIndex);
-    const data = createRepicData(image.url, name, albumId, image.id);
+    // Include crop parameters if present
+    const data = createRepicData(image.url, name, albumId, image.id, image.crop);
 
     return { filename, data };
   });

@@ -124,18 +124,27 @@ export const useWebAlbums = () => {
 
   // Update image crop parameters (for virtual image cropping)
   const updateImageCrop = useCallback((albumId, imageId, crop) => {
-    setAlbums(prev => prev.map(album =>
-      album.id === albumId
-        ? {
-            ...album,
-            images: album.images.map(img =>
-              img.id === imageId
-                ? { ...img, crop }
-                : img
-            )
-          }
-        : album
-    ));
+    console.log('[updateImageCrop] albumId:', albumId, 'imageId:', imageId, 'crop:', crop);
+    setAlbums(prev => {
+      const newAlbums = prev.map(album =>
+        album.id === albumId
+          ? {
+              ...album,
+              images: album.images.map(img =>
+                img.id === imageId
+                  ? { ...img, crop }
+                  : img
+              )
+            }
+          : album
+      );
+      console.log('[updateImageCrop] Updated albums:', newAlbums);
+      // Check if the image was found
+      const targetAlbum = newAlbums.find(a => a.id === albumId);
+      const targetImage = targetAlbum?.images.find(i => i.id === imageId);
+      console.log('[updateImageCrop] Target image after update:', targetImage);
+      return newAlbums;
+    });
   }, []);
 
   // Clear image crop (reset to original)

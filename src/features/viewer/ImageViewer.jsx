@@ -8,6 +8,12 @@ export const ImageViewer = ({ src, crop }) => {
     const containerRef = useRef(null);
     const imageRef = useRef(null);
 
+    // Debug: log crop
+    if (crop) {
+        console.log('[ImageViewer] Rendering with crop:', crop);
+        console.log('[ImageViewer] clipPath will be:', `inset(${crop.y}% ${100 - crop.x - crop.width}% ${100 - crop.y - crop.height}% ${crop.x}%)`);
+    }
+
     const [scale, setScale] = useState(1);
     const [position, setPosition] = useState({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);

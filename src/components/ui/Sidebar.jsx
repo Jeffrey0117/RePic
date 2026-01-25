@@ -126,13 +126,19 @@ export const Sidebar = ({ files, currentIndex, onSelect, cacheVersion = 0, mode 
                                     }
                                 }}
                             >
-                                <img
-                                    src={imgSrc}
-                                    alt=""
-                                    className="w-full h-full object-contain pointer-events-none"
-                                    loading="lazy"
-                                    draggable={false}
-                                />
+                                {imgSrc ? (
+                                    <img
+                                        src={imgSrc}
+                                        alt=""
+                                        className="w-full h-full object-contain pointer-events-none"
+                                        loading="lazy"
+                                        draggable={false}
+                                    />
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-white/20 text-xs">
+                                        Loading...
+                                    </div>
+                                )}
                             </div>
 
                             <div className={`mt-1.5 text-[10px] truncate w-full px-1 text-center font-medium ${isActive ? 'text-primary' : 'text-white/70'}`}>
