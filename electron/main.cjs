@@ -38,17 +38,43 @@ function cleanupTempFiles() {
     }
 }
 
-// Extract og:image URL from HTML (for social media URLs that return HTML)
-function extractOgImage(html) {
-    // Try og:image first
+// Extract image URL from HTML (for social media URLs that return HTML)
+function extractImageFromHtml(html) {
+    // First try: Find img tags with instagram/threads CDN URLs (most accurate for posts)
+    const imgMatches = html.match(/<img[^>]+src=["']([^"']*(?:instagram|fbcdn|cdninstagram)[^"']*)["']/gi);
+    if (imgMatches && imgMatches.length > 0) {
+        // Extract URLs and find the largest resolution one
+        const urls = imgMatches.map(tag => {
+            const srcMatch = tag.match(/src=["']([^"']+)["']/i);
+            return srcMatch ? srcMatch[1] : null;
+        }).filter(Boolean);
+
+        // Prefer URLs with larger dimensions (often have size in URL)
+        const bestUrl = urls.find(url => url.includes('1080') || url.includes('1440'))
+            || urls.find(url => url.includes('640') || url.includes('750'))
+            || urls[0];
+
+        if (bestUrl) {
+            console.log('[extractImageFromHtml] Found img src:', bestUrl);
+            return bestUrl;
+        }
+    }
+
+    // Fallback: Try og:image
     const ogMatch = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
         || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
-    if (ogMatch) return ogMatch[1];
+    if (ogMatch) {
+        console.log('[extractImageFromHtml] Found og:image:', ogMatch[1]);
+        return ogMatch[1];
+    }
 
-    // Try twitter:image
+    // Fallback: Try twitter:image
     const twitterMatch = html.match(/<meta[^>]+name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i)
         || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+name=["']twitter:image["']/i);
-    if (twitterMatch) return twitterMatch[1];
+    if (twitterMatch) {
+        console.log('[extractImageFromHtml] Found twitter:image:', twitterMatch[1]);
+        return twitterMatch[1];
+    }
 
     return null;
 }
@@ -117,13 +143,13 @@ function downloadToTemp(url) {
 
             const contentType = response.headers['content-type'] || '';
 
-            // If response is HTML, try to extract og:image
+            // If response is HTML, try to extract image URL
             if (contentType.includes('text/html')) {
-                console.log('[downloadToTemp] Got HTML, extracting og:image...');
+                console.log('[downloadToTemp] Got HTML, extracting image URL...');
                 let html = '';
                 response.on('data', chunk => html += chunk);
                 response.on('end', () => {
-                    const imageUrl = extractOgImage(html);
+                    const imageUrl = extractImageFromHtml(html);
                     if (imageUrl) {
                         console.log('[downloadToTemp] Found og:image:', imageUrl);
                         // Recursively download the actual image, then cache with original URL
