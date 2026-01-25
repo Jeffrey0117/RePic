@@ -6,7 +6,7 @@ export const Dropzone = ({ onOpenFolder }) => {
     const { t } = useI18n();
 
     return (
-        <div className="text-center p-10 border-2 border-dashed border-zinc-700 rounded-3xl bg-surface/50 max-w-md w-full mx-4">
+        <div className="text-center p-10 rounded-3xl bg-surface/50 max-w-md w-full mx-4">
             <div className="flex flex-col items-center gap-4">
                 <div className="p-4 bg-zinc-800 rounded-full text-zinc-400">
                     <ImageIcon size={48} />

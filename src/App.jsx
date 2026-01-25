@@ -83,7 +83,20 @@ function App() {
   // Sync file system image with local view only when currentImage or cacheVersion changes
   useEffect(() => {
     if (currentImage) {
-      setLocalImage(`file://${currentImage}?v=${cacheVersion}`);
+      // Check if it's a .repic virtual image file
+      if (currentImage.toLowerCase().endsWith('.repic')) {
+        const electronAPI = getElectronAPI();
+        if (electronAPI) {
+          const result = electronAPI.readFile(currentImage);
+          if (result && typeof result === 'object' && result.url) {
+            setLocalImage(result.url);
+          } else {
+            setLocalImage(null);
+          }
+        }
+      } else {
+        setLocalImage(`file://${currentImage}?v=${cacheVersion}`);
+      }
       setIsEditing(false); // Reset editing when switching images
       setIsModified(false); // Reset modified state
     } else {
@@ -422,7 +435,9 @@ function App() {
 
   // Album navigation
   const albumImages = selectedAlbum?.images || [];
-  const currentAlbumImage = albumImages[albumImageIndex]?.url || null;
+  // Ensure index is within bounds (important when switching albums)
+  const safeAlbumIndex = albumImages.length > 0 ? Math.min(albumImageIndex, albumImages.length - 1) : 0;
+  const currentAlbumImage = albumImages.length > 0 ? (albumImages[safeAlbumIndex]?.url || null) : null;
 
   const nextAlbumImage = useCallback(() => {
     if (albumImageIndex < albumImages.length - 1) {
@@ -605,14 +620,16 @@ function App() {
           />
         )}
 
-        {/* Left: Thumbnail Explorer */}
-        <Sidebar
-          files={viewMode === 'album' ? albumImages : files}
-          currentIndex={viewMode === 'album' ? albumImageIndex : currentIndex}
-          cacheVersion={cacheVersion}
-          onSelect={viewMode === 'album' ? setAlbumImageIndex : selectImage}
-          mode={viewMode === 'album' ? 'web' : 'local'}
-        />
+        {/* Left: Thumbnail Explorer - hide when no images */}
+        {((viewMode === 'album' && albumImages.length > 0) || (viewMode !== 'album' && files.length > 0)) && (
+          <Sidebar
+            files={viewMode === 'album' ? albumImages : files}
+            currentIndex={viewMode === 'album' ? safeAlbumIndex : currentIndex}
+            cacheVersion={cacheVersion}
+            onSelect={viewMode === 'album' ? setAlbumImageIndex : selectImage}
+            mode={viewMode === 'album' ? 'web' : 'local'}
+          />
+        )}
 
         {/* Center: Main Viewport */}
         <main className="flex-1 min-w-0 relative main-viewport-bg overflow-hidden transition-all duration-250">
@@ -663,7 +680,7 @@ function App() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-black/20 to-black/40"
+                  className="absolute inset-0 flex flex-col items-center justify-center"
                 >
                   <div className="flex flex-col items-center max-w-md px-8">
                     {/* Icon */}
@@ -768,8 +785,8 @@ function App() {
             ? (currentAlbumImage ? {
                 albumName: selectedAlbum?.name,
                 url: currentAlbumImage,
-                addedAt: albumImages[albumImageIndex]?.addedAt,
-                index: albumImageIndex,
+                addedAt: albumImages[safeAlbumIndex]?.addedAt,
+                index: safeAlbumIndex,
                 total: albumImages.length
               } : null)
             : currentMetadata

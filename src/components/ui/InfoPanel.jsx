@@ -52,7 +52,7 @@ export const InfoPanel = memo(function InfoPanel({ metadata, isVisible = true, m
     return (
         <aside
             style={panelStyle}
-            className="h-full bg-surface/90 backdrop-blur-xl border-l border-white/5 shrink-0"
+            className="h-full bg-surface/90 backdrop-blur-xl border-l border-black/10 dark:border-white/5 shrink-0"
         >
             {/* Fixed width inner container prevents content squish */}
             <div className="flex flex-col h-full p-6" style={{ width: PANEL_WIDTH, minWidth: PANEL_WIDTH }}>
@@ -144,8 +144,10 @@ export const InfoPanel = memo(function InfoPanel({ metadata, isVisible = true, m
                         </div>
                     </>
                 ) : (
-                    <div className="flex items-center justify-center h-full text-white/30 text-sm whitespace-nowrap">
-                        {t('noImageSelected') || 'No image selected'}
+                    <div className="flex flex-col items-center justify-center h-full text-center">
+                        <Info size={32} className="text-white/20 mb-3" />
+                        <p className="text-white/40 text-sm font-medium">{t('details')}</p>
+                        <p className="text-white/20 text-xs mt-1">{t('noImageSelected') || 'Select an image to view details'}</p>
                     </div>
                 )}
             </div>

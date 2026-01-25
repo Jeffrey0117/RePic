@@ -6,7 +6,14 @@ const MIN_WIDTH = 80;
 const MAX_WIDTH = 200;
 const DEFAULT_WIDTH = 120;
 
+const electronAPI = window.electronAPI || null;
+
+// Check if file is a .repic virtual image
+const isRepicFile = (path) => path?.toLowerCase().endsWith('.repic');
+
 export const Sidebar = ({ files, currentIndex, onSelect, cacheVersion = 0, mode = 'local' }) => {
+    // Cache for .repic file URLs
+    const [repicUrls, setRepicUrls] = useState({});
     const [width, setWidth] = useState(() => {
         const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
         if (saved) {
@@ -46,6 +53,28 @@ export const Sidebar = ({ files, currentIndex, onSelect, cacheVersion = 0, mode 
         };
     }, [isResizing, width]);
 
+    // Load .repic file URLs for local mode
+    useEffect(() => {
+        if (mode !== 'local' || !electronAPI) return;
+
+        const loadRepicUrls = async () => {
+            const newUrls = {};
+            for (const file of files) {
+                if (isRepicFile(file) && !repicUrls[file]) {
+                    const result = electronAPI.readFile(file);
+                    if (result && typeof result === 'object' && result.url) {
+                        newUrls[file] = result.url;
+                    }
+                }
+            }
+            if (Object.keys(newUrls).length > 0) {
+                setRepicUrls(prev => ({ ...prev, ...newUrls }));
+            }
+        };
+
+        loadRepicUrls();
+    }, [files, mode]);
+
     return (
         <div
             className="h-full bg-surface/30 backdrop-blur-xl border-r border-white/5 flex flex-col overflow-hidden relative"
@@ -61,7 +90,14 @@ export const Sidebar = ({ files, currentIndex, onSelect, cacheVersion = 0, mode 
                     const fileName = isWeb
                         ? (typeof file === 'string' ? file.split('/').pop()?.split('?')[0] : file.url?.split('/').pop()?.split('?')[0]) || `Image ${index + 1}`
                         : file.split(/[\\/]/).pop();
-                    const imgSrc = isWeb ? fileUrl : `file://${file}?v=${cacheVersion}`;
+
+                    // Handle .repic files in local mode - use cached URL
+                    const isRepic = !isWeb && isRepicFile(file);
+                    const imgSrc = isWeb
+                        ? fileUrl
+                        : isRepic
+                            ? (repicUrls[file] || '')
+                            : `file://${file}?v=${cacheVersion}`;
 
                     return (
                         <motion.div
