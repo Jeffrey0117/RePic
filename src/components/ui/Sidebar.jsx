@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from '../../lib/motion';
 import { getThumbnail, saveThumbnail, generateThumbnail } from '../../utils/thumbnailCache';
 import { getCachedImage, cacheImage } from '../../utils/offlineCache';
+import { preloadImages, getCached } from '../../utils/imageLoader';
+import { LazyImage } from './LazyImage';
 
 const SIDEBAR_WIDTH_KEY = 'sidebar-width';
 const MIN_WIDTH = 80;
@@ -42,12 +44,8 @@ export const Sidebar = ({
     // Drag reorder state
     const [dragIndex, setDragIndex] = useState(null);
     const [dragOverIndex, setDragOverIndex] = useState(null);
-    // Cache for proxied images (when direct load fails)
-    const [proxiedUrls, setProxiedUrls] = useState({});
     // Track failed images (after proxy also failed)
     const [failedImages, setFailedImages] = useState(new Set());
-    // Track loading images (to show placeholder instead of broken image)
-    const [loadingImages, setLoadingImages] = useState(new Set());
     // Cached thumbnails for local files
     const [cachedThumbs, setCachedThumbs] = useState({});
     const [width, setWidth] = useState(() => {
@@ -164,30 +162,29 @@ export const Sidebar = ({
         loadThumbnails();
     }, [files, mode, cacheVersion]);
 
-    // Load cached images for web mode (offline support)
+    // Preload nearby images for web mode (smoother navigation)
     useEffect(() => {
-        if (mode !== 'web') return;
+        if (mode !== 'web' || files.length === 0) return;
 
-        const loadCachedImages = async () => {
-            const visibleFiles = files.slice(0, 50);
+        // Preload images around current index
+        const preloadRange = 5;
+        const urlsToPreload = [];
 
-            for (const file of visibleFiles) {
+        for (let i = -preloadRange; i <= preloadRange; i++) {
+            const idx = currentIndex + i;
+            if (idx >= 0 && idx < files.length && idx !== currentIndex) {
+                const file = files[idx];
                 const url = typeof file === 'string' ? file : file.url;
-                if (!url || proxiedUrls[url]) continue;
-
-                try {
-                    const cached = await getCachedImage(url);
-                    if (cached) {
-                        setProxiedUrls(prev => ({ ...prev, [url]: cached }));
-                    }
-                } catch (e) {
-                    // Ignore cache errors
+                if (url?.startsWith('http')) {
+                    urlsToPreload.push(url);
                 }
             }
-        };
+        }
 
-        loadCachedImages();
-    }, [files, mode]);
+        if (urlsToPreload.length > 0) {
+            preloadImages(urlsToPreload);
+        }
+    }, [files, mode, currentIndex]);
 
     return (
         <div
@@ -276,10 +273,8 @@ export const Sidebar = ({
                             ? (repicInfo?.url || '')
                             : `file://${file}?v=${cacheVersion}`;
 
-                    // Use proxied URL for web, original URL for local
-                    const imgSrc = isWeb
-                        ? (proxiedUrls[fileUrl] || originalUrl)
-                        : originalUrl;
+                    // For local files, use file:// URL directly
+                    const imgSrc = isWeb ? originalUrl : originalUrl;
 
                     // Check if image failed to load
                     const isFailed = isWeb && failedImages.has(fileUrl);
@@ -374,83 +369,35 @@ export const Sidebar = ({
                                         <span className="text-sm">✕</span>
                                         <span className="text-[8px] mt-0.5">暫不支援</span>
                                     </div>
-                                ) : imgSrc ? (
-                                    <>
-                                        {/* Loading placeholder - shows while image loads */}
-                                        {isWeb && loadingImages.has(fileUrl) && (
-                                            <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                                                <div className="w-4 h-4 border-2 border-white/30 border-t-white/80 rounded-full animate-spin" />
+                                ) : isWeb && originalUrl.startsWith('http') ? (
+                                    // Web images: use LazyImage with optimized loader
+                                    <LazyImage
+                                        src={originalUrl}
+                                        className="w-full h-full"
+                                        style={clipPath ? { clipPath } : undefined}
+                                        isHighPriority={Math.abs(index - currentIndex) <= 2}
+                                        onError={() => setFailedImages(prev => new Set([...prev, fileUrl]))}
+                                        fallbackElement={
+                                            <div className="w-full h-full flex flex-col items-center justify-center bg-black/30 text-white/40">
+                                                <span className="text-sm">✕</span>
+                                                <span className="text-[8px] mt-0.5">暫不支援</span>
                                             </div>
-                                        )}
-                                        <img
-                                            src={imgSrc}
-                                            alt=""
-                                            className={`w-full h-full object-contain pointer-events-none transition-opacity ${isWeb && loadingImages.has(fileUrl) ? 'opacity-0' : 'opacity-100'}`}
-                                            style={clipPath ? { clipPath } : undefined}
-                                            loading="lazy"
-                                            draggable={false}
-                                            referrerPolicy="no-referrer"
-                                            onLoadStart={() => {
-                                                if (isWeb && !proxiedUrls[fileUrl]) {
-                                                    setLoadingImages(prev => new Set([...prev, fileUrl]));
-                                                }
-                                            }}
-                                            onLoad={(e) => {
-                                                setLoadingImages(prev => {
-                                                    const newSet = new Set(prev);
-                                                    newSet.delete(fileUrl);
-                                                    return newSet;
-                                                });
-                                                // Cache for offline use (web images only, not already cached)
-                                                if (isWeb && !proxiedUrls[fileUrl] && originalUrl.startsWith('http')) {
-                                                    // Convert loaded image to base64 and cache
-                                                    try {
-                                                        const canvas = document.createElement('canvas');
-                                                        const img = e.target;
-                                                        canvas.width = img.naturalWidth;
-                                                        canvas.height = img.naturalHeight;
-                                                        canvas.getContext('2d').drawImage(img, 0, 0);
-                                                        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-                                                        cacheImage(originalUrl, dataUrl);
-                                                    } catch (err) {
-                                                        // Cross-origin images may fail, ignore
-                                                    }
-                                                }
-                                            }}
-                                            onError={async (e) => {
-                                                // Remove from loading
-                                                setLoadingImages(prev => {
-                                                    const newSet = new Set(prev);
-                                                    newSet.delete(fileUrl);
-                                                    return newSet;
-                                                });
-                                                // If image fails to load and we haven't tried proxy yet
-                                                if (isWeb && originalUrl.startsWith('http') && !proxiedUrls[fileUrl] && electronAPI?.proxyImage) {
-                                                    setLoadingImages(prev => new Set([...prev, fileUrl]));
-                                                    console.log('[Sidebar] Image failed, trying proxy:', originalUrl);
-                                                    const result = await electronAPI.proxyImage(originalUrl);
-                                                    setLoadingImages(prev => {
-                                                        const newSet = new Set(prev);
-                                                        newSet.delete(fileUrl);
-                                                        return newSet;
-                                                    });
-                                                    if (result.success) {
-                                                        setProxiedUrls(prev => ({ ...prev, [fileUrl]: result.data }));
-                                                        // Cache the proxied image for offline use
-                                                        cacheImage(originalUrl, result.data);
-                                                    } else {
-                                                        setFailedImages(prev => new Set([...prev, fileUrl]));
-                                                    }
-                                                } else if (isWeb && proxiedUrls[fileUrl]) {
-                                                    setFailedImages(prev => new Set([...prev, fileUrl]));
-                                                }
-                                            }}
-                                        />
-                                    </>
+                                        }
+                                    />
+                                ) : imgSrc ? (
+                                    // Local files: direct img tag
+                                    <img
+                                        src={imgSrc}
+                                        alt=""
+                                        className="w-full h-full object-contain pointer-events-none"
+                                        style={clipPath ? { clipPath } : undefined}
+                                        loading="lazy"
+                                        draggable={false}
+                                        referrerPolicy="no-referrer"
+                                    />
                                 ) : (
-                                    // Loading spinner only for web images or .repic files loading
-                                    // Regular local files should always have imgSrc
-                                    (isWeb || isRepic) ? (
+                                    // Loading spinner for .repic files loading
+                                    isRepic ? (
                                         <div className="w-full h-full flex items-center justify-center bg-black/20">
                                             <div className="w-4 h-4 border-2 border-white/30 border-t-white/80 rounded-full animate-spin" />
                                         </div>
