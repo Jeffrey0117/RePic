@@ -475,10 +475,12 @@ function App() {
 
   // Copy image to clipboard
   const handleCopy = async () => {
-    // Determine current image source
+    // Determine current image source and crop params
     let imageSrc = null;
+    let cropParams = null;
     if (viewMode === 'album' && currentAlbumImage) {
       imageSrc = currentAlbumImage;
+      cropParams = albumImages[safeAlbumIndex]?.crop;
     } else if (viewMode === 'virtual' && virtualImageData?.url) {
       imageSrc = virtualImageData.url;
     } else if (localImage) {
@@ -532,9 +534,20 @@ function App() {
         img.src = URL.createObjectURL(blob);
       });
 
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-      ctx.drawImage(img, 0, 0);
+      // Apply crop if exists
+      if (cropParams) {
+        const cropX = (cropParams.x / 100) * img.naturalWidth;
+        const cropY = (cropParams.y / 100) * img.naturalHeight;
+        const cropW = (cropParams.width / 100) * img.naturalWidth;
+        const cropH = (cropParams.height / 100) * img.naturalHeight;
+        canvas.width = cropW;
+        canvas.height = cropH;
+        ctx.drawImage(img, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+      } else {
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        ctx.drawImage(img, 0, 0);
+      }
 
       URL.revokeObjectURL(img.src);
 
