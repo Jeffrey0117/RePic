@@ -308,6 +308,26 @@ export const clearMemoryCache = () => {
 };
 
 /**
+ * Cache a proxy result (for images that needed proxy due to CORS)
+ * Also generates and caches thumbnail
+ */
+export const cacheProxyResult = (url, base64Data) => {
+  if (!url || !base64Data) return;
+
+  // Cache the full image
+  memoryCache.set(url, base64Data);
+  cacheImage(url, base64Data).catch(() => {});
+
+  // Generate and cache thumbnail (async, don't block)
+  generateThumbnail(base64Data).then(thumb => {
+    if (thumb) {
+      thumbCache.set(url, thumb);
+      cacheImage(THUMB_PREFIX + url, thumb).catch(() => {});
+    }
+  });
+};
+
+/**
  * Get loader stats (for debugging)
  */
 export const getStats = () => ({

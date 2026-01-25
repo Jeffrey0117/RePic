@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, memo } from 'react';
-import { loadImage, loadThumbnail, getCached, getCachedThumbnail, PRIORITY_HIGH, PRIORITY_NORMAL, PRIORITY_LOW } from '../../utils/imageLoader';
+import { loadImage, loadThumbnail, getCached, getCachedThumbnail, cacheProxyResult, PRIORITY_HIGH, PRIORITY_NORMAL, PRIORITY_LOW } from '../../utils/imageLoader';
 
 const electronAPI = window.electronAPI || null;
 
@@ -98,11 +98,13 @@ export const LazyImage = memo(({
             })
             .catch(async (err) => {
                 console.log('[LazyImage] Load failed, trying proxy:', src);
-                // Try proxy if direct load fails
+                // Try proxy if direct load fails (CORS issues)
                 if (electronAPI?.proxyImage) {
                     try {
                         const result = await electronAPI.proxyImage(src);
                         if (result.success) {
+                            // Cache the proxy result for future use (including thumbnail generation)
+                            cacheProxyResult(src, result.data);
                             setLoadedSrc(result.data);
                             setIsLoading(false);
                             onLoad?.();
