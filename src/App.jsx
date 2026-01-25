@@ -82,6 +82,9 @@ function App() {
   // Album sidebar collapsed state
   const [albumSidebarCollapsed, setAlbumSidebarCollapsed] = useState(false);
 
+  // Drag-drop state for album mode
+  const [isDragOver, setIsDragOver] = useState(false);
+
   // Export dialog state
   const [showExportDialog, setShowExportDialog] = useState(false);
 
@@ -193,6 +196,66 @@ function App() {
       loadFolder(currentPath, true);
     }
   }, [viewMode, currentPath, loadFolder]);
+
+  // Handle drag-drop for album mode (accept images from web browsers)
+  const handleDragOver = useCallback((e) => {
+    if (viewMode !== 'album' || !selectedAlbumId) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
+  }, [viewMode, selectedAlbumId]);
+
+  const handleDragLeave = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+  }, []);
+
+  const handleDrop = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+
+    if (viewMode !== 'album' || !selectedAlbumId) return;
+
+    // Try to extract image URL from the drop event
+    const dataTransfer = e.dataTransfer;
+    let imageUrl = null;
+
+    // Method 1: Check for text/uri-list (direct URL)
+    const uriList = dataTransfer.getData('text/uri-list');
+    if (uriList) {
+      const urls = uriList.split('\n').filter(u => u.trim() && !u.startsWith('#'));
+      if (urls.length > 0) {
+        imageUrl = urls[0].trim();
+      }
+    }
+
+    // Method 2: Check for text/html and extract img src
+    if (!imageUrl) {
+      const html = dataTransfer.getData('text/html');
+      if (html) {
+        const match = html.match(/<img[^>]+src=["']([^"']+)["']/i);
+        if (match) {
+          imageUrl = match[1];
+        }
+      }
+    }
+
+    // Method 3: Check for plain text URL
+    if (!imageUrl) {
+      const text = dataTransfer.getData('text/plain');
+      if (text && text.trim().startsWith('http')) {
+        imageUrl = text.trim();
+      }
+    }
+
+    // Add the image to the album if we found a valid URL
+    if (imageUrl && imageUrl.startsWith('http')) {
+      addAlbumImage(selectedAlbumId, imageUrl);
+      setToast({ visible: true, message: t('imageAdded') || 'Image added!' });
+    }
+  }, [viewMode, selectedAlbumId, addAlbumImage, t]);
 
   const handleCropComplete = async (result) => {
     // Check if this is a virtual image crop (returns crop params instead of image)
@@ -814,7 +877,22 @@ function App() {
         )}
 
         {/* Center: Main Viewport */}
-        <main className="flex-1 min-w-0 relative main-viewport-bg overflow-hidden transition-all duration-250">
+        <main
+          className={`flex-1 min-w-0 relative main-viewport-bg overflow-hidden transition-all duration-250 ${
+            isDragOver && viewMode === 'album' ? 'ring-4 ring-primary/50 ring-inset' : ''
+          }`}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          {/* Drag-drop overlay indicator */}
+          {isDragOver && viewMode === 'album' && (
+            <div className="absolute inset-0 z-50 bg-primary/10 flex items-center justify-center pointer-events-none">
+              <div className="bg-black/80 text-white px-6 py-4 rounded-xl text-lg font-medium">
+                {t('dropToAdd') || 'Drop to add image'}
+              </div>
+            </div>
+          )}
           <AnimatePresence mode="wait">
             {viewMode === 'virtual' ? (
               // Virtual image mode (opened from .repic file)

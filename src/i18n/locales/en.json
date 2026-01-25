@@ -110,5 +110,7 @@
   "noImageToCopy": "No image to copy",
   "copySuccess": "Copied to clipboard!",
   "copyFailed": "Copy failed",
-  "cropSaved": "Crop saved!"
+  "cropSaved": "Crop saved!",
+  "dropToAdd": "Drop to add image",
+  "imageAdded": "Image added!"
 }
