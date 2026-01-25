@@ -408,8 +408,8 @@ export const Sidebar = ({
                 onMouseDown={handleScrollDragStart}
                 className={`flex-1 no-scrollbar select-none ${
                     isHorizontal
-                        ? 'overflow-x-auto overflow-y-hidden px-4 py-2 flex flex-row gap-3 items-center'
-                        : 'overflow-y-auto py-4 px-2 space-y-3'
+                        ? 'overflow-x-auto overflow-y-hidden px-4 py-3 flex flex-row gap-3 items-center'
+                        : 'overflow-y-auto py-4 px-3 space-y-3'
                 } ${isDragScrolling ? 'cursor-grabbing' : ''}`}
             >
                 {files.map((file, index) => {
@@ -507,7 +507,7 @@ export const Sidebar = ({
                             <div
                                 className={`
                                     rounded-lg overflow-hidden border-2 transition-all duration-200 shadow-lg bg-black/50 relative
-                                    ${isSelected ? 'border-green-500 ring-2 ring-green-500/30' : isActive ? 'border-primary ring-2 ring-primary/20 scale-105' : 'border-transparent group-hover:border-white/30'}
+                                    ${isSelected ? 'border-green-500' : isActive ? 'border-primary' : 'border-transparent group-hover:border-white/20'}
                                     ${isDragOver ? 'border-primary border-dashed' : ''}
                                 `}
                                 style={{ width: `${thumbSize}px`, height: `${thumbSize}px` }}
