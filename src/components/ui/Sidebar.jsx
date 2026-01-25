@@ -578,14 +578,14 @@ export const Sidebar = ({
                 })}
             </div>
 
-            {/* Resize Handle - wider hit area for easier dragging */}
+            {/* Resize Handle */}
             <div
                 onMouseDown={handleResizeMouseDown}
                 className={`
-                    absolute transition-colors duration-150 z-50
+                    absolute transition-colors duration-150 z-50 pointer-events-auto
                     ${isHorizontal
-                        ? 'left-0 top-0 h-2 w-full cursor-row-resize -translate-y-1'
-                        : 'top-0 right-0 w-2 h-full cursor-col-resize translate-x-1'
+                        ? 'left-0 top-0 h-2 w-full cursor-row-resize'
+                        : 'top-0 right-0 w-2 h-full cursor-col-resize'
                     }
                     ${isResizing ? 'bg-primary' : 'bg-transparent hover:bg-white/30'}
                 `}
