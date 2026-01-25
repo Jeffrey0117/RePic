@@ -67,10 +67,31 @@ function downloadToTemp(url) {
 
         const protocol = url.startsWith('https') ? https : http;
 
-        const request = protocol.get(url, (response) => {
+        // Add browser-like headers to bypass restrictions
+        const options = {
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Referer': urlObj.origin + '/',
+                'Sec-Fetch-Dest': 'image',
+                'Sec-Fetch-Mode': 'no-cors',
+                'Sec-Fetch-Site': 'same-origin'
+            }
+        };
+
+        console.log('[downloadToTemp] Downloading:', url);
+
+        const request = protocol.get(url, options, (response) => {
+            console.log('[downloadToTemp] Response status:', response.statusCode);
+
             // Follow redirects
             if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
-                downloadToTemp(response.headers.location).then(resolve).catch(reject);
+                const redirectUrl = response.headers.location.startsWith('http')
+                    ? response.headers.location
+                    : new URL(response.headers.location, url).href;
+                console.log('[downloadToTemp] Redirecting to:', redirectUrl);
+                downloadToTemp(redirectUrl).then(resolve).catch(reject);
                 return;
             }
 
@@ -85,6 +106,7 @@ function downloadToTemp(url) {
             fileStream.on('finish', () => {
                 fileStream.close();
                 downloadCache.set(url, tempPath);
+                console.log('[downloadToTemp] Saved to:', tempPath);
                 resolve(tempPath);
             });
 
@@ -94,7 +116,10 @@ function downloadToTemp(url) {
             });
         });
 
-        request.on('error', reject);
+        request.on('error', (err) => {
+            console.error('[downloadToTemp] Error:', err.message);
+            reject(err);
+        });
         request.setTimeout(30000, () => {
             request.destroy();
             reject(new Error('Download timeout'));
@@ -424,10 +449,19 @@ function setupIpcHandlers() {
 
     // Proxy image download - bypass browser restrictions
     ipcMain.handle('proxy-image', async (event, url) => {
+        console.log('[proxy-image] Requested:', url);
         try {
             const filePath = await downloadToTemp(url);
             // Read the file and return as base64
             const buffer = fs.readFileSync(filePath);
+
+            // Check if the file is actually an image (not HTML)
+            const firstBytes = buffer.slice(0, 20).toString('utf-8');
+            if (firstBytes.includes('<!DOCTYPE') || firstBytes.includes('<html')) {
+                console.error('[proxy-image] Received HTML instead of image');
+                return { success: false, error: 'URL returned HTML, not an image' };
+            }
+
             const ext = path.extname(filePath).toLowerCase();
             const mimeTypes = {
                 '.jpg': 'image/jpeg',
@@ -438,9 +472,10 @@ function setupIpcHandlers() {
             };
             const mimeType = mimeTypes[ext] || 'image/jpeg';
             const base64 = `data:${mimeType};base64,${buffer.toString('base64')}`;
+            console.log('[proxy-image] Success, size:', buffer.length);
             return { success: true, data: base64 };
         } catch (e) {
-            console.error('[proxy-image] Error:', e);
+            console.error('[proxy-image] Error:', e.message);
             return { success: false, error: e.message };
         }
     });
