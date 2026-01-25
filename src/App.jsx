@@ -1130,51 +1130,53 @@ function App() {
       />
 
       {/* 2. Main Content Area */}
-      <div className={`flex-1 overflow-hidden flex transition-all duration-300 ${sidebarPosition === 'bottom' ? 'flex-col' : 'flex-row'}`}>
-        {/* Horizontal row: AlbumSidebar + (Sidebar if left) + main + InfoPanel */}
-        <div className={`flex flex-row min-h-0 overflow-hidden ${sidebarPosition === 'bottom' ? 'flex-1' : 'flex-1'}`}>
-          {/* Album Sidebar - only in album mode */}
-          {viewMode === 'album' && (
-            <AlbumSidebar
-              albums={albums}
-              selectedAlbumId={selectedAlbumId}
-              onSelectAlbum={selectAlbum}
-              onCreateAlbum={createAlbum}
-              onRenameAlbum={renameAlbum}
-              onDeleteAlbum={deleteAlbum}
-              onExportAlbums={exportAlbums}
-              onImportAlbums={(json) => {
-                const result = importAlbums(json);
-                if (result.success) {
-                  setToast({ visible: true, message: `匯入成功 (${result.count} 個相簿)` });
-                } else {
-                  setToast({ visible: true, message: `匯入失敗: ${result.error}` });
-                }
-              }}
-              isVisible={!albumSidebarCollapsed}
-            />
-          )}
+      <div className="flex-1 overflow-hidden flex flex-row transition-all duration-300">
+        {/* Album Sidebar - always full height on the left */}
+        {viewMode === 'album' && (
+          <AlbumSidebar
+            albums={albums}
+            selectedAlbumId={selectedAlbumId}
+            onSelectAlbum={selectAlbum}
+            onCreateAlbum={createAlbum}
+            onRenameAlbum={renameAlbum}
+            onDeleteAlbum={deleteAlbum}
+            onExportAlbums={exportAlbums}
+            onImportAlbums={(json) => {
+              const result = importAlbums(json);
+              if (result.success) {
+                setToast({ visible: true, message: `匯入成功 (${result.count} 個相簿)` });
+              } else {
+                setToast({ visible: true, message: `匯入失敗: ${result.error}` });
+              }
+            }}
+            isVisible={!albumSidebarCollapsed}
+          />
+        )}
 
-          {/* Left Sidebar: Thumbnail Explorer - only when position is left */}
-          {sidebarPosition === 'left' && ((viewMode === 'album' && albumImages.length > 0) || (viewMode !== 'album' && files.length > 0)) && (
-            <Sidebar
-              files={viewMode === 'album' ? albumImages : files}
-              currentIndex={viewMode === 'album' ? safeAlbumIndex : currentIndex}
-              cacheVersion={cacheVersion}
-              onSelect={viewMode === 'album' ? setAlbumImageIndex : selectImage}
-              mode={viewMode === 'album' ? 'web' : 'local'}
-              isMultiSelectMode={viewMode === 'album' && isMultiSelectMode}
-              selectedIds={selectedImageIds}
-              onToggleSelect={toggleImageSelection}
-              onEnterMultiSelect={() => setIsMultiSelectMode(true)}
-              onExitMultiSelect={exitMultiSelectMode}
-              onDeleteSelected={handleBatchDelete}
-              onDownloadSelected={handleBatchDownload}
-              onUploadSelected={handleBatchUpload}
-              onReorder={viewMode === 'album' ? (from, to) => reorderImages(selectedAlbumId, from, to) : undefined}
-              position={sidebarPosition}
-            />
-          )}
+        {/* Right content area: changes layout based on sidebar position */}
+        <div className={`flex-1 flex min-w-0 overflow-hidden ${sidebarPosition === 'bottom' ? 'flex-col' : 'flex-row'}`}>
+          {/* Inner row: (Sidebar if left) + main + InfoPanel */}
+          <div className="flex flex-row flex-1 min-h-0 min-w-0 overflow-hidden">
+            {/* Left Sidebar: Thumbnail Explorer - only when position is left */}
+            {sidebarPosition === 'left' && ((viewMode === 'album' && albumImages.length > 0) || (viewMode !== 'album' && files.length > 0)) && (
+              <Sidebar
+                files={viewMode === 'album' ? albumImages : files}
+                currentIndex={viewMode === 'album' ? safeAlbumIndex : currentIndex}
+                cacheVersion={cacheVersion}
+                onSelect={viewMode === 'album' ? setAlbumImageIndex : selectImage}
+                mode={viewMode === 'album' ? 'web' : 'local'}
+                isMultiSelectMode={viewMode === 'album' && isMultiSelectMode}
+                selectedIds={selectedImageIds}
+                onToggleSelect={toggleImageSelection}
+                onEnterMultiSelect={() => setIsMultiSelectMode(true)}
+                onExitMultiSelect={exitMultiSelectMode}
+                onDeleteSelected={handleBatchDelete}
+                onDownloadSelected={handleBatchDownload}
+                onUploadSelected={handleBatchUpload}
+                onReorder={viewMode === 'album' ? (from, to) => reorderImages(selectedAlbumId, from, to) : undefined}
+                position={sidebarPosition}
+              />
+            )}
 
         {/* Center: Main Viewport */}
         <main
@@ -1377,6 +1379,7 @@ function App() {
             position={sidebarPosition}
           />
         )}
+        </div>
       </div>
 
       {/* Post-Crop Save Toolbar */}
