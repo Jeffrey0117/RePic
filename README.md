@@ -112,13 +112,13 @@ Output: `release/` folder
 - [ ] Batch materialize (.repic → download → local, option to delete .repic)
 
 ### Phase 3 - Performance
-- [ ] Thumbnail cache (avoid re-scaling large images)
+- [x] Thumbnail cache (IndexedDB)
 - [ ] Virtual scroll for large image lists
-- [ ] Offline cache for web album images
+- [x] Offline cache for web album images
 
-### Phase 4 - Advanced
+### Phase 4 - Advanced ✅
 - [x] Album import/export (JSON backup)
-- [ ] Sidebar position toggle (left / bottom)
+- [x] Sidebar position toggle (left / bottom)
 
 ---
 
