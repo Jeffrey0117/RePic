@@ -132,5 +132,16 @@
   "estimatedSize": "預估大小",
   "cropHint": "拖動調整裁切區域",
   "removeBgHint": "自動移除圖片背景",
-  "removeBgNotImplemented": "去背功能開發中..."
+  "removeBgNotImplemented": "去背功能開發中...",
+  "about": "關於",
+  "version": "版本",
+  "aboutDescription": "快速、輕量的圖片管理工具。支援本地圖片瀏覽、網頁圖片收藏、基礎編輯等功能。",
+  "allRightsReserved": "保留所有權利。",
+  "close": "關閉",
+  "confirmDiscard": "放棄變更",
+  "confirmClose": "關閉確認",
+  "confirmDelete": "刪除確認",
+  "download": "下載",
+  "album": "相簿",
+  "local": "本地"
 }

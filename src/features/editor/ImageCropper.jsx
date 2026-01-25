@@ -42,17 +42,31 @@ export const ImageCropper = ({ imageSrc, onCancel, onComplete, fileCount = 1, on
     };
 
     const handleSave = async () => {
-        // For virtual images, return crop parameters instead of generating image
-        if (isVirtual && crop) {
+        // For virtual images, return edit parameters instead of generating image
+        if (isVirtual) {
+            // Convert annotations to percentage-based coordinates
+            const img = imgRef.current;
+            const percentAnnotations = img && annotations.length > 0
+                ? annotations.map(ann => ({
+                    type: ann.type,
+                    x: (ann.x / img.clientWidth) * 100,
+                    y: (ann.y / img.clientHeight) * 100,
+                    width: (ann.width / img.clientWidth) * 100,
+                    height: (ann.height / img.clientHeight) * 100,
+                    unit: '%'
+                }))
+                : [];
+
             onComplete({
-                type: 'crop-params',
-                crop: {
+                type: 'edit-params',
+                crop: crop ? {
                     x: crop.x,
                     y: crop.y,
                     width: crop.width,
                     height: crop.height,
                     unit: '%'
-                }
+                } : null,
+                annotations: percentAnnotations
             });
             return;
         }
@@ -103,7 +117,8 @@ export const ImageCropper = ({ imageSrc, onCancel, onComplete, fileCount = 1, on
                             onLoad={onImageLoad}
                             className="max-w-full"
                             style={{
-                                maxHeight: 'calc(100vh - 200px)',
+                                maxHeight: 'calc(100vh - 350px)',
+                                maxWidth: 'calc(100vw - 120px)',
                                 display: 'block'
                             }}
                             referrerPolicy="no-referrer"

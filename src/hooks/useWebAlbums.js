@@ -45,15 +45,21 @@ const cleanupExpiredImages = (albums) => {
  * Hook for managing web albums with localStorage persistence
  * Supports soft delete with 7-day retention
  */
+// Shared initial load (called once at module init, avoids repeated reads)
+let _initialAlbums = null;
+const getInitialAlbums = () => {
+  if (_initialAlbums === null) {
+    _initialAlbums = cleanupExpiredImages(loadFromStorage());
+  }
+  return _initialAlbums;
+};
+
 export const useWebAlbums = () => {
   // Lazy initialization from localStorage - runs only once, with cleanup
-  const [albums, setAlbums] = useState(() => {
-    const loaded = loadFromStorage();
-    return cleanupExpiredImages(loaded);
-  });
+  const [albums, setAlbums] = useState(getInitialAlbums);
   const [selectedAlbumId, setSelectedAlbumId] = useState(() => {
-    const stored = loadFromStorage();
-    return stored.length > 0 ? stored[0].id : null;
+    const initial = getInitialAlbums();
+    return initial.length > 0 ? initial[0].id : null;
   });
 
   // Save albums to localStorage whenever they change (debounced)
@@ -204,9 +210,8 @@ export const useWebAlbums = () => {
     return album.images.filter(img => img.deletedAt);
   }, [albums]);
 
-  // Update image crop parameters (for virtual image cropping)
-  const updateImageCrop = useCallback((albumId, imageId, crop) => {
-    console.log('[updateImageCrop] albumId:', albumId, 'imageId:', imageId, 'crop:', crop);
+  // Update image edit parameters (crop and annotations)
+  const updateImageCrop = useCallback((albumId, imageId, crop, annotations = null) => {
     setAlbums(prev => {
       const newAlbums = prev.map(album =>
         album.id === albumId
@@ -214,17 +219,16 @@ export const useWebAlbums = () => {
               ...album,
               images: album.images.map(img =>
                 img.id === imageId
-                  ? { ...img, crop }
+                  ? {
+                      ...img,
+                      crop,
+                      annotations: annotations?.length > 0 ? annotations : undefined
+                    }
                   : img
               )
             }
           : album
       );
-      console.log('[updateImageCrop] Updated albums:', newAlbums);
-      // Check if the image was found
-      const targetAlbum = newAlbums.find(a => a.id === albumId);
-      const targetImage = targetAlbum?.images.find(i => i.id === imageId);
-      console.log('[updateImageCrop] Target image after update:', targetImage);
       return newAlbums;
     });
   }, []);

@@ -5,25 +5,36 @@
  * They allow users to organize and browse web images without downloading them.
  */
 
-const REPIC_VERSION = 1;
+const REPIC_VERSION = 2;
 
 /**
- * Create a .repic file data object
+ * Create a .repic file data object (v2)
  * @param {string} url - The image URL
  * @param {string} name - Display name for the image
- * @param {string} albumId - Optional source album ID
- * @param {string} imageId - Optional source image ID
- * @param {object} crop - Optional crop parameters { x, y, width, height } in percentages
+ * @param {object} options - Optional parameters
+ * @param {string} options.albumId - Source album ID
+ * @param {string} options.albumName - Source album name (for display when album is deleted)
+ * @param {string} options.imageId - Source image ID
+ * @param {object} options.crop - Crop parameters { x, y, width, height, unit }
+ * @param {Array} options.annotations - Annotation array [{ type, x, y, width, height, unit }]
+ * @param {object} options.original - Original image dimensions { width, height }
  * @returns {object} .repic file data
  */
-export function createRepicData(url, name, albumId = null, imageId = null, crop = null) {
+export function createRepicData(url, name, options = {}) {
+  const {
+    albumId = null,
+    albumName = null,
+    imageId = null,
+    crop = null,
+    annotations = null,
+    original = null
+  } = options;
+
   const data = {
     v: REPIC_VERSION,
     type: 'virtual-image',
     url,
     name: name || extractNameFromUrl(url),
-    albumId,
-    imageId,
     createdAt: Date.now()
   };
 
@@ -32,6 +43,45 @@ export function createRepicData(url, name, albumId = null, imageId = null, crop 
     data.crop = crop;
   }
 
+  // Include annotations if present
+  if (annotations && annotations.length > 0) {
+    data.annotations = annotations;
+  }
+
+  // Include source album info
+  if (albumId || albumName || imageId) {
+    data.source = {
+      albumId,
+      albumName,
+      imageId,
+      exportedAt: Date.now()
+    };
+  }
+
+  // Include original dimensions for crop validation
+  if (original) {
+    data.original = original;
+  }
+
+  return data;
+}
+
+/**
+ * Legacy support: Create v1 format (for compatibility)
+ */
+export function createRepicDataV1(url, name, albumId = null, imageId = null, crop = null) {
+  const data = {
+    v: 1,
+    type: 'virtual-image',
+    url,
+    name: name || extractNameFromUrl(url),
+    albumId,
+    imageId,
+    createdAt: Date.now()
+  };
+  if (crop) {
+    data.crop = crop;
+  }
   return data;
 }
 
@@ -105,16 +155,43 @@ export function isRepicFile(filePath) {
  * Prepare album images for batch export
  * @param {Array} images - Array of album images
  * @param {string} albumId - The album ID
+ * @param {string} albumName - The album name
  * @param {boolean} useIndex - Whether to prefix filenames with index
  * @returns {Array} Array of { filename, data } objects ready for export
  */
-export function prepareAlbumExport(images, albumId, useIndex = false) {
+export function prepareAlbumExport(images, albumId, albumName, useIndex = false) {
   return images.map((image, index) => {
     const name = image.name || extractNameFromUrl(image.url);
     const filename = generateRepicFilename(name, index, useIndex);
-    // Include crop parameters if present
-    const data = createRepicData(image.url, name, albumId, image.id, image.crop);
+    const data = createRepicData(image.url, name, {
+      albumId,
+      albumName,
+      imageId: image.id,
+      crop: image.crop,
+      annotations: image.annotations
+    });
 
     return { filename, data };
   });
+}
+
+/**
+ * Prepare single image for export
+ * @param {object} image - Image object { url, id, crop, name }
+ * @param {string} albumId - Source album ID
+ * @param {string} albumName - Source album name
+ * @returns {object} { filename, data } ready for export
+ */
+export function prepareSingleExport(image, albumId = null, albumName = null) {
+  const name = image.name || extractNameFromUrl(image.url);
+  const filename = generateRepicFilename(name);
+  const data = createRepicData(image.url, name, {
+    albumId,
+    albumName,
+    imageId: image.id,
+    crop: image.crop,
+    annotations: image.annotations
+  });
+
+  return { filename, data };
 }

@@ -34,7 +34,7 @@ export const ExportVirtualDialog = ({
 
     try {
       // Prepare files for export
-      const files = prepareAlbumExport(album.images, album.id, useNumbered);
+      const files = prepareAlbumExport(album.images, album.id, album.name, useNumbered);
 
       // Write files
       const result = await electronAPI.writeRepicFilesBatch(targetFolder, files);

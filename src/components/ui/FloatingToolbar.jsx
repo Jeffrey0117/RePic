@@ -1,0 +1,240 @@
+import { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from '../../lib/motion';
+import {
+  RotateCcw,
+  Scissors,
+  Trash2,
+  Download,
+  Upload,
+  FolderOutput,
+  Layers,
+  Copy
+} from '../icons';
+import { useTheme } from '../../contexts/ThemeContext';
+import useI18n from '../../hooks/useI18n';
+
+/**
+ * Floating toolbar at the bottom center of the screen
+ * Auto-hides when mouse is idle, shows on hover
+ */
+export const FloatingToolbar = ({
+  onRefresh,
+  onToggleEdit,
+  isEditing,
+  onCopy,
+  isCopying,
+  onUpload,
+  isUploading,
+  onToggleUploadHistory,
+  uploadHistoryCount,
+  onExportVirtual,
+  onDelete,
+  onSave,
+  hasImage,
+  viewMode,
+  selectedAlbum,
+  isMultiSelectMode,
+  selectedImageIds
+}) => {
+  const { t } = useI18n();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark';
+
+  const [isVisible, setIsVisible] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const timeoutRef = useRef(null);
+  const toolbarRef = useRef(null);
+
+  // Auto-hide logic
+  useEffect(() => {
+    const handleMouseMove = (e) => {
+      // Show when near the bottom of the screen (80px zone)
+      const isNearBottom = window.innerHeight - e.clientY < 80;
+
+      if (isNearBottom || isHovered) {
+        setIsVisible(true);
+        clearTimeout(timeoutRef.current);
+      } else {
+        // Start hide timer (1.5s)
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = setTimeout(() => {
+          if (!isHovered) {
+            setIsVisible(false);
+          }
+        }, 1500);
+      }
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      clearTimeout(timeoutRef.current);
+    };
+  }, [isHovered]);
+
+  // Keep visible when editing
+  useEffect(() => {
+    if (isEditing) {
+      setIsVisible(true);
+    }
+  }, [isEditing]);
+
+  const deleteTitle = isMultiSelectMode && selectedImageIds?.size > 0
+    ? `${t('delete')} (${selectedImageIds.size})`
+    : t('delete');
+
+  const isDeleteDisabled = isMultiSelectMode
+    ? selectedImageIds?.size === 0
+    : !hasImage;
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        ref={toolbarRef}
+        initial={{ y: 20, opacity: 0 }}
+        animate={{
+          y: isVisible ? 0 : 20,
+          opacity: isVisible ? 1 : 0
+        }}
+        transition={{ duration: 0.2, ease: 'easeOut' }}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-2 py-1.5 rounded-2xl border shadow-2xl backdrop-blur-xl ${
+          isDark
+            ? 'bg-black/70 border-white/10'
+            : 'bg-white/80 border-black/10'
+        }`}
+        style={{
+          pointerEvents: isVisible ? 'auto' : 'none'
+        }}
+      >
+        <div className="flex items-center gap-0.5">
+          <ToolButton
+            icon={RotateCcw}
+            title={t('refresh')}
+            onClick={onRefresh}
+            theme={theme}
+          />
+
+          <Divider theme={theme} />
+
+          <ToolButton
+            icon={Scissors}
+            title={t('editArea')}
+            onClick={onToggleEdit}
+            active={isEditing}
+            disabled={!hasImage}
+            theme={theme}
+          />
+
+          <ToolButton
+            icon={Copy}
+            title={t('copyToClipboard')}
+            onClick={onCopy}
+            disabled={isCopying || !hasImage}
+            loading={isCopying}
+            theme={theme}
+          />
+
+          <ToolButton
+            icon={Download}
+            title={t('download')}
+            onClick={onSave}
+            disabled={!hasImage}
+            theme={theme}
+          />
+
+          <Divider theme={theme} />
+
+          <ToolButton
+            icon={Upload}
+            title={t('upload')}
+            onClick={onUpload}
+            disabled={isUploading || viewMode === 'album'}
+            loading={isUploading}
+            theme={theme}
+          />
+
+          <ToolButton
+            icon={Layers}
+            title={t('uploadHistory')}
+            onClick={onToggleUploadHistory}
+            badge={uploadHistoryCount}
+            theme={theme}
+          />
+
+          <Divider theme={theme} />
+
+          <ToolButton
+            icon={FolderOutput}
+            title={t('exportVirtual')}
+            onClick={onExportVirtual}
+            disabled={viewMode !== 'album' || !selectedAlbum?.images?.length}
+            theme={theme}
+          />
+
+          <ToolButton
+            icon={Trash2}
+            title={deleteTitle}
+            onClick={onDelete}
+            disabled={isDeleteDisabled}
+            danger
+            badge={isMultiSelectMode ? selectedImageIds?.size || 0 : 0}
+            theme={theme}
+          />
+        </div>
+      </motion.div>
+    </AnimatePresence>
+  );
+};
+
+const Divider = ({ theme }) => (
+  <div className={`w-px h-6 mx-1 ${theme === 'dark' ? 'bg-white/10' : 'bg-black/10'}`} />
+);
+
+const ToolButton = ({
+  icon: Icon,
+  title,
+  onClick,
+  active = false,
+  disabled = false,
+  loading = false,
+  danger = false,
+  badge = 0,
+  theme = 'dark'
+}) => {
+  const isDark = theme === 'dark';
+
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      disabled={disabled}
+      className={`p-2.5 rounded-xl transition-all relative ${
+        disabled
+          ? 'opacity-40 cursor-not-allowed'
+          : active
+            ? 'bg-primary/20 text-primary'
+            : danger
+              ? isDark
+                ? 'hover:bg-red-500/20 text-red-400 hover:text-red-300'
+                : 'hover:bg-red-50 text-red-500 hover:text-red-600'
+              : isDark
+                ? 'hover:bg-white/10 text-white/60 hover:text-white'
+                : 'hover:bg-black/10 text-gray-500 hover:text-gray-800'
+      }`}
+    >
+      <Icon size={20} className={loading ? 'animate-pulse' : ''} />
+      {badge > 0 && (
+        <span className={`absolute -top-1 -right-1 text-white text-[10px] rounded-full min-w-[16px] h-4 flex items-center justify-center font-bold px-1 ${
+          danger ? 'bg-red-500' : 'bg-primary'
+        }`}>
+          {badge > 99 ? '99+' : badge}
+        </span>
+      )}
+    </button>
+  );
+};
+
+export default FloatingToolbar;

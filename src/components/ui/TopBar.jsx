@@ -3,19 +3,11 @@ import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from '../../lib/motion';
 import {
     FolderOpen,
-    FolderOutput,
-    RotateCcw,
-    Scissors,
-    Trash2,
-    Download,
-    Upload,
     Info,
     Globe,
     Sun,
     Moon,
-    Layers,
-    Album,
-    Copy
+    Album
 } from '../icons';
 import { Button } from './Button';
 import useI18n from '../../hooks/useI18n';
@@ -63,7 +55,16 @@ const X = ({ size = 24, className = '' }) => (
     </svg>
 );
 
-export const TopBar = ({ currentPath, onOpenFolder, onRefresh, isEditing, onToggleEdit, onClear, onDeleteAlbumImage, onSave, onCopy, isCopying, onUpload, isUploading, uploadHistoryCount, onToggleUploadHistory, showInfoPanel, onToggleInfo, viewMode, onToggleViewMode, selectedAlbum, onAddAlbumImage, albumSidebarCollapsed, onToggleAlbumSidebar, onExportVirtual, hasImage, sidebarPosition, onToggleSidebarPosition, isMultiSelectMode, selectedImageIds, onDeleteSelected }) => {
+// Help/About icon
+const HelpCircle = ({ size = 24, className = '' }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <circle cx="12" cy="12" r="10" />
+        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+        <path d="M12 17h.01" />
+    </svg>
+);
+
+export const TopBar = ({ currentPath, onOpenFolder, showInfoPanel, onToggleInfo, viewMode, onToggleViewMode, selectedAlbum, onAddAlbumImage, albumSidebarCollapsed, onToggleAlbumSidebar, sidebarPosition, onToggleSidebarPosition, onAbout }) => {
     const { t, language, setLanguage } = useI18n();
     const { theme, toggleTheme } = useTheme();
     const [urlInput, setUrlInput] = useState('');
@@ -196,29 +197,27 @@ export const TopBar = ({ currentPath, onOpenFolder, onRefresh, isEditing, onTogg
                 )}
             </div>
 
-            {/* Center: Main Tools */}
-            <div className={`flex items-center rounded-xl p-1 border ${theme === 'dark' ? 'bg-black/20 border-white/5' : 'bg-black/5 border-black/10'}`}>
-                <ToolButton icon={Album} title={t('webAlbum')} onClick={onToggleViewMode} active={viewMode === 'album'} theme={theme} />
-                <div className={`w-px h-6 mx-1 ${theme === 'dark' ? 'bg-white/10' : 'bg-black/10'}`} />
-                <ToolButton icon={RotateCcw} title={t('refresh')} onClick={onRefresh} theme={theme} />
-                <ToolButton icon={Scissors} title={t('editArea')} onClick={onToggleEdit} active={isEditing} disabled={!hasImage} theme={theme} />
-                <ToolButton icon={Copy} title={t('copyToClipboard')} onClick={onCopy} disabled={isCopying || !hasImage} loading={isCopying} theme={theme} />
-                <ToolButton icon={Upload} title={t('upload')} onClick={onUpload} disabled={isUploading || viewMode === 'album'} loading={isUploading} theme={theme} />
-                <ToolButton icon={Layers} title={t('uploadHistory')} onClick={onToggleUploadHistory} badge={uploadHistoryCount} theme={theme} />
-                <ToolButton icon={FolderOutput} title={t('exportVirtual')} onClick={onExportVirtual} disabled={viewMode !== 'album' || !selectedAlbum?.images?.length} theme={theme} />
-                <ToolButton
-                    icon={Trash2}
-                    title={isMultiSelectMode && selectedImageIds?.size > 0 ? `${t('delete')} (${selectedImageIds.size})` : t('delete')}
-                    className="text-danger"
-                    onClick={isMultiSelectMode && selectedImageIds?.size > 0 ? onDeleteSelected : (viewMode === 'album' ? onDeleteAlbumImage : onClear)}
-                    disabled={isMultiSelectMode ? selectedImageIds?.size === 0 : !hasImage}
-                    badge={isMultiSelectMode ? selectedImageIds?.size || 0 : 0}
-                    theme={theme}
-                />
-            </div>
-
             {/* Right: Actions */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1">
+                {/* Mode toggle */}
+                <Button
+                    variant="ghost"
+                    className={`h-9 px-3 rounded-lg flex items-center gap-2 transition-all ${
+                        viewMode === 'album'
+                            ? 'bg-primary/20 text-primary'
+                            : theme === 'dark'
+                                ? 'hover:bg-white/10 text-white/70'
+                                : 'hover:bg-black/10 text-gray-600'
+                    }`}
+                    onClick={onToggleViewMode}
+                    title={t('webAlbum')}
+                >
+                    <Album size={18} />
+                    <span className="text-xs font-medium">{viewMode === 'album' ? t('album') : t('local')}</span>
+                </Button>
+
+                <div className={`w-px h-6 mx-1 ${theme === 'dark' ? 'bg-white/10' : 'bg-black/10'}`} />
+
                 {/* Always on top toggle */}
                 <button
                     className={`h-9 w-9 p-0 rounded-lg transition-colors flex items-center justify-center ${
@@ -264,8 +263,13 @@ export const TopBar = ({ currentPath, onOpenFolder, onRefresh, isEditing, onTogg
                 >
                     {sidebarPosition === 'left' ? <PanelBottom size={18} /> : <PanelLeft size={18} />}
                 </Button>
-                <Button variant="ghost" className={`h-9 w-9 p-0 rounded-lg hover:bg-black/10 dark:hover:bg-white/5 ${theme === 'dark' ? 'text-white/70' : 'text-gray-600'}`} onClick={onSave}>
-                    <Download size={18} className="hover:text-primary transition-colors" />
+                <Button
+                    variant="ghost"
+                    className={`h-9 w-9 p-0 rounded-lg hover:bg-black/10 dark:hover:bg-white/5 ${theme === 'dark' ? 'text-white/70' : 'text-gray-600'}`}
+                    onClick={onAbout}
+                    title={t('about')}
+                >
+                    <HelpCircle size={18} />
                 </Button>
             </div>
 
@@ -370,26 +374,3 @@ export const TopBar = ({ currentPath, onOpenFolder, onRefresh, isEditing, onTogg
     );
 };
 
-const ToolButton = ({ icon: Icon, title, onClick, className = "", active = false, disabled = false, loading = false, badge = 0, theme = 'dark' }) => (
-    <button
-        onClick={onClick}
-        title={title}
-        disabled={disabled}
-        className={`p-2.5 rounded-lg transition-all relative ${
-            disabled
-                ? 'opacity-50 cursor-not-allowed'
-                : active
-                    ? 'bg-primary/20 text-primary'
-                    : theme === 'dark'
-                        ? 'hover:bg-white/10 text-white/60 hover:text-white'
-                        : 'hover:bg-black/10 text-gray-500 hover:text-gray-800'
-        } ${className}`}
-    >
-        <Icon size={22} className={loading ? 'animate-pulse' : ''} />
-        {badge > 0 && (
-            <span className="absolute -top-1 -right-1 bg-primary text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-bold">
-                {badge > 9 ? '9+' : badge}
-            </span>
-        )}
-    </button>
-);

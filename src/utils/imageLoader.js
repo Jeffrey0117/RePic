@@ -20,9 +20,61 @@ const THUMB_SIZE = 256; // Max dimension
 const THUMB_QUALITY = 0.7; // JPEG quality (0.7 = ~10KB per thumb)
 const THUMB_PREFIX = 'thumb:';
 
+// Cache limits (LRU eviction)
+const MAX_MEMORY_CACHE = 50; // ~50 full images (~50MB max)
+const MAX_THUMB_CACHE = 200; // ~200 thumbnails (~2MB max)
+
+/**
+ * Simple LRU Cache implementation using Map's insertion order
+ */
+class LRUCache {
+  constructor(maxSize) {
+    this.maxSize = maxSize;
+    this.cache = new Map();
+  }
+
+  get(key) {
+    if (!this.cache.has(key)) return undefined;
+    // Move to end (most recently used)
+    const value = this.cache.get(key);
+    this.cache.delete(key);
+    this.cache.set(key, value);
+    return value;
+  }
+
+  set(key, value) {
+    // Delete if exists to update order
+    if (this.cache.has(key)) {
+      this.cache.delete(key);
+    }
+    this.cache.set(key, value);
+    // Evict oldest if over limit
+    if (this.cache.size > this.maxSize) {
+      const oldest = this.cache.keys().next().value;
+      this.cache.delete(oldest);
+    }
+  }
+
+  has(key) {
+    return this.cache.has(key);
+  }
+
+  delete(key) {
+    return this.cache.delete(key);
+  }
+
+  clear() {
+    this.cache.clear();
+  }
+
+  get size() {
+    return this.cache.size;
+  }
+}
+
 // State
-const memoryCache = new Map(); // URL -> base64/blob URL
-const thumbCache = new Map(); // URL -> thumbnail base64
+const memoryCache = new LRUCache(MAX_MEMORY_CACHE); // URL -> base64/blob URL
+const thumbCache = new LRUCache(MAX_THUMB_CACHE); // URL -> thumbnail base64
 const loadingPromises = new Map(); // URL -> Promise (dedup concurrent requests)
 const queue = []; // Priority queue: { url, priority, resolve, reject }
 let activeCount = 0;
@@ -67,14 +119,29 @@ const generateThumbnail = (base64) => {
 };
 
 /**
+ * Insert item into queue maintaining priority order (binary search)
+ */
+const enqueue = (item) => {
+  // Binary search for insert position
+  let lo = 0, hi = queue.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (queue[mid].priority <= item.priority) {
+      lo = mid + 1;
+    } else {
+      hi = mid;
+    }
+  }
+  queue.splice(lo, 0, item);
+};
+
+/**
  * Process the next item in the queue
  */
 const processQueue = () => {
   if (activeCount >= MAX_CONCURRENT || queue.length === 0) return;
 
-  // Sort by priority (lower = higher priority)
-  queue.sort((a, b) => a.priority - b.priority);
-
+  // Queue is already sorted, just take first item
   const item = queue.shift();
   if (!item) return;
 
@@ -181,7 +248,7 @@ export const loadImage = (url, priority = PRIORITY_NORMAL) => {
 
   // Create new loading promise
   const promise = new Promise((resolve, reject) => {
-    queue.push({ url, priority, resolve, reject });
+    enqueue({ url, priority, resolve, reject });
     processQueue();
   });
 
@@ -332,7 +399,9 @@ export const cacheProxyResult = (url, base64Data) => {
  */
 export const getStats = () => ({
   memoryCacheSize: memoryCache.size,
+  memoryCacheMax: MAX_MEMORY_CACHE,
   thumbCacheSize: thumbCache.size,
+  thumbCacheMax: MAX_THUMB_CACHE,
   queueLength: queue.length,
   activeCount,
   maxConcurrent: MAX_CONCURRENT

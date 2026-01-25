@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { getThumbnail, saveThumbnail, generateThumbnail } from '../../utils/thumbnailCache';
 import { getCachedImage, cacheImage } from '../../utils/offlineCache';
 import { preloadImages, preloadThumbnails, getCached } from '../../utils/imageLoader';
@@ -39,6 +39,7 @@ export const Sidebar = ({
     onDownloadSelected,
     onUploadSelected,
     onReorder,
+    onContextMenu,
     position = 'left' // 'left' or 'bottom'
 }) => {
     const isHorizontal = position === 'bottom';
@@ -166,6 +167,45 @@ export const Sidebar = ({
     // Calculate thumbnail size based on position
     const thumbSize = isHorizontal ? height - 60 : width - 24; // Leave room for labels
 
+    // Virtual scrolling state
+    const [scrollPosition, setScrollPosition] = useState(0);
+    const [containerSize, setContainerSize] = useState(0);
+    const ITEM_GAP = 12; // gap between items
+    const ITEM_SIZE = thumbSize + 40 + ITEM_GAP; // thumb + label + gap
+    const OVERSCAN = 3; // Extra items to render outside viewport
+
+    // Calculate visible range
+    const visibleRange = useMemo(() => {
+      const startIndex = Math.max(0, Math.floor(scrollPosition / ITEM_SIZE) - OVERSCAN);
+      const visibleCount = Math.ceil(containerSize / ITEM_SIZE) + OVERSCAN * 2;
+      const endIndex = Math.min(files.length - 1, startIndex + visibleCount);
+      return { startIndex, endIndex };
+    }, [scrollPosition, containerSize, ITEM_SIZE, files.length]);
+
+    // Total scrollable size
+    const totalSize = files.length * ITEM_SIZE;
+
+    // Handle scroll
+    const handleScroll = useCallback((e) => {
+      const pos = isHorizontal ? e.target.scrollLeft : e.target.scrollTop;
+      setScrollPosition(pos);
+    }, [isHorizontal]);
+
+    // Update container size on resize
+    useEffect(() => {
+      const container = scrollContainerRef.current;
+      if (!container) return;
+
+      const updateSize = () => {
+        setContainerSize(isHorizontal ? container.clientWidth : container.clientHeight);
+      };
+      updateSize();
+
+      const observer = new ResizeObserver(updateSize);
+      observer.observe(container);
+      return () => observer.disconnect();
+    }, [isHorizontal]);
+
     // Scroll to current item when it changes or files change
     useEffect(() => {
         const container = scrollContainerRef.current;
@@ -173,22 +213,19 @@ export const Sidebar = ({
 
         // Small delay to ensure DOM has updated with new items
         const timeoutId = setTimeout(() => {
-            const itemSize = thumbSize + 12; // thumbnail size + gap
-            const scrollPos = currentIndex * itemSize;
+            const scrollPos = currentIndex * ITEM_SIZE;
 
             if (isHorizontal) {
-                const containerWidth = container.clientWidth;
-                const targetScroll = scrollPos - containerWidth / 2 + itemSize / 2;
+                const targetScroll = scrollPos - container.clientWidth / 2 + ITEM_SIZE / 2;
                 container.scrollTo({ left: Math.max(0, targetScroll), behavior: 'smooth' });
             } else {
-                const containerHeight = container.clientHeight;
-                const targetScroll = scrollPos - containerHeight / 2 + itemSize / 2;
+                const targetScroll = scrollPos - container.clientHeight / 2 + ITEM_SIZE / 2;
                 container.scrollTo({ top: Math.max(0, targetScroll), behavior: 'smooth' });
             }
         }, 50);
 
         return () => clearTimeout(timeoutId);
-    }, [currentIndex, thumbSize, isHorizontal, files.length]);
+    }, [currentIndex, ITEM_SIZE, isHorizontal, files.length]);
 
     const handleResizeMouseDown = useCallback((e) => {
         e.preventDefault();
@@ -411,13 +448,22 @@ export const Sidebar = ({
             <div
                 ref={scrollContainerRef}
                 onMouseDown={handleScrollDragStart}
-                className={`flex-1 no-scrollbar select-none ${
+                onScroll={handleScroll}
+                className={`flex-1 no-scrollbar select-none relative ${
                     isHorizontal
-                        ? 'overflow-x-auto overflow-y-hidden px-4 py-3 flex flex-row gap-3 items-center'
-                        : 'overflow-y-auto py-4 px-3 space-y-3'
+                        ? 'overflow-x-auto overflow-y-hidden'
+                        : 'overflow-y-auto'
                 } ${isDragScrolling ? 'cursor-grabbing' : ''}`}
             >
-                {files.map((file, index) => {
+                {/* Virtual scroll spacer */}
+                <div
+                    style={isHorizontal
+                        ? { width: totalSize, height: '100%', position: 'relative' }
+                        : { height: totalSize, width: '100%', position: 'relative' }
+                    }
+                >
+                {files.slice(visibleRange.startIndex, visibleRange.endIndex + 1).map((file, i) => {
+                    const index = visibleRange.startIndex + i;
                     const isActive = index === currentIndex;
                     // For local mode: file is a path, extract filename
                     // For web mode: file is a URL or object with url property
@@ -472,6 +518,12 @@ export const Sidebar = ({
                                     onSelect(index);
                                 }
                             }}
+                            onContextMenu={(e) => {
+                                if (onContextMenu && isWeb) {
+                                    e.preventDefault();
+                                    onContextMenu(e, file, index);
+                                }
+                            }}
                             draggable={canReorder}
                             onDragStart={(e) => {
                                 if (canReorder) {
@@ -502,8 +554,11 @@ export const Sidebar = ({
                                 setDragIndex(null);
                                 setDragOverIndex(null);
                             }}
-                            className={`relative cursor-pointer group flex flex-col items-center transition-transform duration-100 ${isDragging ? 'opacity-50' : ''} ${isDragOver ? 'scale-110' : ''} ${!isMultiSelectMode && !isDragging ? 'hover:scale-105 active:scale-95' : ''}`}
-                            style={{ contentVisibility: 'auto', containIntrinsicSize: `${thumbSize}px ${thumbSize + 40}px` }}
+                            className={`absolute cursor-pointer group flex flex-col items-center transition-transform duration-100 ${isDragging ? 'opacity-50' : ''} ${isDragOver ? 'scale-110' : ''} ${!isMultiSelectMode && !isDragging ? 'hover:scale-105 active:scale-95' : ''}`}
+                            style={isHorizontal
+                                ? { left: index * ITEM_SIZE + 16, top: 12, width: thumbSize }
+                                : { top: index * ITEM_SIZE + 16, left: 12, width: thumbSize }
+                            }
                         >
                             <div className="text-[10px] text-white/40 truncate w-full mb-1 text-center group-hover:text-white/80 transition-colors">
                                 {index + 1}
@@ -581,6 +636,7 @@ export const Sidebar = ({
                         </div>
                     );
                 })}
+                </div>
             </div>
 
             {/* Resize Handle */}

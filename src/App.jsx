@@ -9,9 +9,16 @@ import { SaveToolbar } from './components/ui/SaveToolbar';
 import { Toast } from './components/ui/Toast';
 import { UploadHistoryPanel } from './components/ui/UploadHistoryPanel';
 import { ExportVirtualDialog } from './components/ui/ExportVirtualDialog';
+import { ConfirmDialog } from './components/ui/ConfirmDialog';
+import { AboutDialog } from './components/ui/AboutDialog';
+import { ContextMenu } from './components/ui/ContextMenu';
+import { FloatingToolbar } from './components/ui/FloatingToolbar';
+import { Copy, Download, FolderOutput, Trash2, Pencil } from './components/icons';
+import { prepareSingleExport } from './utils/repicFile';
 import { AlbumSidebar } from './features/album/AlbumSidebar';
 import { useFileSystem } from './hooks/useFileSystem';
 import { useWebAlbums } from './hooks/useWebAlbums';
+import { useConfirmDialog } from './hooks/useConfirmDialog';
 import useI18n from './hooks/useI18n';
 import { loadImage, PRIORITY_HIGH } from './utils/imageLoader';
 
@@ -63,6 +70,7 @@ function App() {
   // Local state for edits/UI
   const [localImage, setLocalImage] = useState(null);
   const [localCrop, setLocalCrop] = useState(null);
+  const [localAnnotations, setLocalAnnotations] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [showInfoPanel, setShowInfoPanel] = useState(false);
   const [isModified, setIsModified] = useState(false);
@@ -105,6 +113,15 @@ function App() {
   const [selectedImageIds, setSelectedImageIds] = useState(new Set());
   const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
 
+  // Custom confirm dialog
+  const [confirm, confirmDialogProps] = useConfirmDialog();
+
+  // About dialog state
+  const [showAboutDialog, setShowAboutDialog] = useState(false);
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState({ isOpen: false, position: { x: 0, y: 0 }, target: null });
+
   // Sync file system image with local view only when currentImage or cacheVersion changes
   useEffect(() => {
     if (currentImage) {
@@ -116,20 +133,24 @@ function App() {
           if (result && typeof result === 'object' && result.url) {
             setLocalImage(result.url);
             setLocalCrop(result.crop || null);
+            setLocalAnnotations(result.annotations || null);
           } else {
             setLocalImage(null);
             setLocalCrop(null);
+            setLocalAnnotations(null);
           }
         }
       } else {
         setLocalImage(`file://${currentImage}?v=${cacheVersion}`);
         setLocalCrop(null);
+        setLocalAnnotations(null);
       }
       setIsEditing(false); // Reset editing when switching images
       setIsModified(false); // Reset modified state
     } else {
       setLocalImage(null);
       setLocalCrop(null);
+      setLocalAnnotations(null);
       setIsModified(false);
     }
   }, [currentImage, cacheVersion]); // Also depend on cacheVersion for refresh after save
@@ -155,16 +176,37 @@ function App() {
     if (electronAPI?.onOpenVirtualImage) {
       electronAPI.onOpenVirtualImage((data) => {
         console.log('[App] Received virtual image:', data);
+
+        // Smart jump: Check if source album exists
+        const sourceAlbumId = data.source?.albumId || data.albumId;
+        const sourceImageId = data.source?.imageId || data.imageId;
+
+        if (sourceAlbumId) {
+          // Check if album exists in our albums list
+          const targetAlbum = albums.find(a => a.id === sourceAlbumId);
+          if (targetAlbum) {
+            console.log('[App] Found source album, jumping to:', targetAlbum.name);
+            // Switch to album mode
+            selectAlbum(sourceAlbumId);
+            setViewMode('album');
+            // Find the image index in the album
+            const imgIndex = targetAlbum.images.findIndex(img => img.id === sourceImageId);
+            if (imgIndex >= 0) {
+              setAlbumImageIndex(imgIndex);
+            }
+            return;
+          }
+        }
+
+        // Album not found or no albumId - use virtual mode
         setVirtualImageData(data);
         setVirtualSiblings(data.siblingFiles || []);
-        // Find current index in siblings
         const idx = (data.siblingFiles || []).findIndex(f => f === data.filePath);
         setVirtualIndex(idx >= 0 ? idx : 0);
-        // Switch to a special virtual mode (use 'virtual' view mode)
         setViewMode('virtual');
       });
     }
-  }, []);
+  }, [albums, selectAlbum]);
 
   // Virtual image navigation
   const navigateVirtual = useCallback(async (newIndex) => {
@@ -342,40 +384,41 @@ function App() {
   }, [viewMode, selectedAlbumId, addAlbumImage, addAlbumImages, selectedAlbum?.images?.length, t, looksLikeImageUrl]);
 
   const handleCropComplete = async (result) => {
-    // Check if this is a virtual image crop (returns crop params instead of image)
-    if (result && typeof result === 'object' && result.type === 'crop-params') {
-      // Virtual image crop in album mode - save to localStorage
+    // Check if this is a virtual image edit (returns edit params instead of image)
+    if (result && typeof result === 'object' && (result.type === 'crop-params' || result.type === 'edit-params')) {
+      // Virtual image edit in album mode - save to localStorage
       if (viewMode === 'album' && selectedAlbumId && albumImages[safeAlbumIndex]) {
         const imageId = albumImages[safeAlbumIndex].id;
-        updateImageCrop(selectedAlbumId, imageId, result.crop);
+        updateImageCrop(selectedAlbumId, imageId, result.crop, result.annotations);
         setToast({ visible: true, message: t('cropSaved') });
       }
-      // Virtual image crop in local mode (.repic file) - save crop to file
+      // Virtual image edit in local mode (.repic file) - save to file
       else if (viewMode === 'local' && currentImage?.toLowerCase().endsWith('.repic')) {
         const electronAPI = getElectronAPI();
         if (electronAPI) {
           // Read current .repic data
           const currentData = electronAPI.readFile(currentImage);
           if (currentData && currentData.url) {
-            // Update with new crop
+            // Update with new crop and annotations
             const updatedData = {
-              v: 1,
+              v: 2,
               type: 'virtual-image',
               url: currentData.url,
               name: currentData.name,
-              albumId: currentData.albumId,
-              imageId: currentData.imageId,
+              source: currentData.source,
               crop: result.crop,
-              createdAt: Date.now()
+              annotations: result.annotations?.length > 0 ? result.annotations : undefined,
+              createdAt: currentData.createdAt || Date.now()
             };
             // Write back to file
             const writeResult = await electronAPI.writeRepicFile(currentImage, updatedData);
             if (writeResult.success) {
               setLocalCrop(result.crop);
+              setLocalAnnotations(result.annotations || null);
               setCacheVersion(prev => prev + 1); // Refresh sidebar thumbnails
               setToast({ visible: true, message: t('cropSaved') });
             } else {
-              console.error('[handleCropComplete] Failed to save crop:', writeResult.error);
+              console.error('[handleCropComplete] Failed to save edit:', writeResult.error);
               setToast({ visible: true, message: t('saveFailed') });
             }
           }
@@ -456,8 +499,14 @@ function App() {
     }
   };
 
-  const handleDiscard = () => {
-    if (confirm(t("discardChanges"))) {
+  const handleDiscard = async () => {
+    const confirmed = await confirm(t("discardChanges"), {
+      title: t('confirmDiscard'),
+      confirmText: t('discard'),
+      cancelText: t('cancel'),
+      danger: true
+    });
+    if (confirmed) {
       if (currentImage) {
         setLocalImage(`file://${currentImage}`);
       } else {
@@ -580,8 +629,13 @@ function App() {
     setIsModified(false);
   };
 
-  const handleClear = () => {
-    if (confirm(t("closeImage"))) {
+  const handleClear = async () => {
+    const confirmed = await confirm(t("closeImage"), {
+      title: t('confirmClose'),
+      confirmText: t('close'),
+      cancelText: t('cancel')
+    });
+    if (confirmed) {
       setLocalImage(null);
       setIsEditing(false);
     }
@@ -601,10 +655,16 @@ function App() {
   }, []);
 
   // Batch delete selected images
-  const handleBatchDelete = useCallback(() => {
+  const handleBatchDelete = useCallback(async () => {
     if (selectedImageIds.size === 0 || !selectedAlbumId) return;
 
-    if (confirm(t('deleteSelectedConfirm', { count: selectedImageIds.size }))) {
+    const confirmed = await confirm(t('deleteSelectedConfirm', { count: selectedImageIds.size }), {
+      title: t('confirmDelete'),
+      confirmText: t('delete'),
+      cancelText: t('cancel'),
+      danger: true
+    });
+    if (confirmed) {
       // Delete all selected images
       selectedImageIds.forEach(imageId => {
         removeAlbumImage(selectedAlbumId, imageId);
@@ -615,7 +675,7 @@ function App() {
       // Reset index if needed
       setAlbumImageIndex(0);
     }
-  }, [selectedImageIds, selectedAlbumId, removeAlbumImage, t]);
+  }, [selectedImageIds, selectedAlbumId, removeAlbumImage, t, confirm]);
 
   // Exit multi-select mode
   const exitMultiSelectMode = useCallback(() => {
@@ -746,6 +806,59 @@ function App() {
     setSelectedImageIds(new Set());
     setIsMultiSelectMode(false);
   }, [selectedImageIds, selectedAlbum, t]);
+
+  // Single image export to .repic
+  const handleExportSingle = useCallback(async (image, album = null) => {
+    const electronAPI = getElectronAPI();
+    if (!electronAPI) return;
+
+    const { filename, data } = prepareSingleExport(
+      image,
+      album?.id || null,
+      album?.name || null
+    );
+
+    // Show save dialog
+    const { canceled, filePath } = await electronAPI.showSaveDialog(filename);
+    if (canceled || !filePath) return;
+
+    try {
+      const result = await electronAPI.writeRepicFile(filePath, data);
+      if (result.success) {
+        setToast({ visible: true, message: t('exportSuccess', { count: 1 }) });
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (e) {
+      console.error('[handleExportSingle] Error:', e);
+      setToast({ visible: true, message: t('exportFailed', { error: e.message }) });
+    }
+  }, [t]);
+
+  // Handle image context menu
+  const handleImageContextMenu = useCallback((e, image, album = null) => {
+    e.preventDefault();
+    setContextMenu({
+      isOpen: true,
+      position: { x: e.clientX, y: e.clientY },
+      target: { type: 'image', image, album }
+    });
+  }, []);
+
+  // Handle album context menu
+  const handleAlbumContextMenu = useCallback((e, album) => {
+    e.preventDefault();
+    setContextMenu({
+      isOpen: true,
+      position: { x: e.clientX, y: e.clientY },
+      target: { type: 'album', album }
+    });
+  }, []);
+
+  // Close context menu
+  const closeContextMenu = useCallback(() => {
+    setContextMenu({ isOpen: false, position: { x: 0, y: 0 }, target: null });
+  }, []);
 
   const handleSave = async () => {
     // For album mode: download web image to local
@@ -1216,35 +1329,6 @@ function App() {
       <TopBar
         currentPath={currentPath}
         onOpenFolder={handleOpenFile}
-        onRefresh={handleRefresh}
-        isEditing={isEditing}
-        onToggleEdit={() => setIsEditing(!isEditing)}
-        onClear={handleClear}
-        onDeleteAlbumImage={() => {
-          if (viewMode === 'album' && selectedAlbumId && albumImages[safeAlbumIndex]) {
-            const imageToDelete = albumImages[safeAlbumIndex];
-            if (confirm(t('deleteImageConfirm'))) {
-              removeAlbumImage(selectedAlbumId, imageToDelete.id);
-              // Also remove from multi-select if selected
-              setSelectedImageIds(prev => {
-                const newSet = new Set(prev);
-                newSet.delete(imageToDelete.id);
-                return newSet;
-              });
-              // Navigate to previous image if deleting last, otherwise stay at current index
-              if (safeAlbumIndex >= albumImages.length - 1 && safeAlbumIndex > 0) {
-                setAlbumImageIndex(prev => prev - 1);
-              }
-            }
-          }
-        }}
-        onSave={handleSave}
-        onCopy={handleCopy}
-        isCopying={isCopying}
-        onUpload={handleUpload}
-        isUploading={isUploading}
-        uploadHistoryCount={uploadHistory.length}
-        onToggleUploadHistory={() => setShowUploadHistory(!showUploadHistory)}
         showInfoPanel={showInfoPanel}
         onToggleInfo={() => setShowInfoPanel(!showInfoPanel)}
         viewMode={viewMode}
@@ -1252,26 +1336,20 @@ function App() {
         selectedAlbum={selectedAlbum}
         onAddAlbumImage={(url) => {
           if (selectedAlbumId) {
-            // Preload immediately (generates thumbnail in background)
             loadImage(url, PRIORITY_HIGH).catch(() => {});
             addAlbumImage(selectedAlbumId, url);
-            // Jump to newly added image
             setAlbumImageIndex(albumImages.length);
           }
         }}
         albumSidebarCollapsed={albumSidebarCollapsed}
         onToggleAlbumSidebar={() => setAlbumSidebarCollapsed(!albumSidebarCollapsed)}
-        onExportVirtual={() => setShowExportDialog(true)}
-        hasImage={!!(localImage || currentAlbumImage || virtualImageData?.url)}
         sidebarPosition={sidebarPosition}
         onToggleSidebarPosition={() => {
           const newPos = sidebarPosition === 'left' ? 'bottom' : 'left';
           setSidebarPosition(newPos);
           localStorage.setItem('repic-sidebar-position', newPos);
         }}
-        isMultiSelectMode={viewMode === 'album' && isMultiSelectMode}
-        selectedImageIds={selectedImageIds}
-        onDeleteSelected={handleBatchDelete}
+        onAbout={() => setShowAboutDialog(true)}
       />
 
       {/* 2. Main Content Area */}
@@ -1294,6 +1372,7 @@ function App() {
                 setToast({ visible: true, message: `匯入失敗: ${result.error}` });
               }
             }}
+            onContextMenu={handleAlbumContextMenu}
             isVisible={!albumSidebarCollapsed}
           />
         )}
@@ -1319,6 +1398,7 @@ function App() {
                 onDownloadSelected={handleBatchDownload}
                 onUploadSelected={handleBatchUpload}
                 onReorder={viewMode === 'album' ? (from, to) => reorderImages(selectedAlbumId, from, to) : undefined}
+                onContextMenu={viewMode === 'album' ? (e, image) => handleImageContextMenu(e, image, selectedAlbum) : undefined}
                 position={sidebarPosition}
               />
             )}
@@ -1339,7 +1419,7 @@ function App() {
                   className="absolute inset-0 z-10 bg-[#0f0f0f]"
                 >
                   <div className="w-full h-full p-4">
-                    <ImageViewer src={virtualImageData.url} />
+                    <ImageViewer src={virtualImageData.url} crop={virtualImageData.crop} annotations={virtualImageData.annotations} />
                   </div>
                   {/* Navigation info */}
                   <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 px-4 py-2 rounded-lg text-white/80 text-sm">
@@ -1363,9 +1443,10 @@ function App() {
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   className="absolute inset-0 z-10 bg-[#0f0f0f]"
+                  onContextMenu={(e) => handleImageContextMenu(e, albumImages[safeAlbumIndex], selectedAlbum)}
                 >
                   <div className="w-full h-full p-4">
-                    <ImageViewer src={currentAlbumImage} crop={albumImages[safeAlbumIndex]?.crop} />
+                    <ImageViewer src={currentAlbumImage} crop={albumImages[safeAlbumIndex]?.crop} annotations={albumImages[safeAlbumIndex]?.annotations} />
                   </div>
                 </motion.div>
               ) : (
@@ -1436,7 +1517,7 @@ function App() {
                   className="absolute inset-0 z-10 bg-[#0f0f0f]"
                 >
                   <div className="w-full h-full p-4">
-                    <ImageViewer src={localImage} crop={localCrop} />
+                    <ImageViewer src={localImage} crop={localCrop} annotations={localAnnotations} />
                   </div>
                 </motion.div>
               ) : !localImage ? (
@@ -1453,29 +1534,6 @@ function App() {
             )}
           </AnimatePresence>
 
-          {/* Image Cropper - inside main area */}
-          <AnimatePresence>
-            {isEditing && (localImage || currentAlbumImage) && (
-              <motion.div
-                key="editor"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="absolute inset-0 z-20 bg-black"
-              >
-                <Suspense fallback={<div className="flex items-center justify-center h-full"><div className="text-white/60 animate-pulse">Loading editor...</div></div>}>
-                  <ImageEditor
-                    imageSrc={viewMode === 'album' ? currentAlbumImage : localImage}
-                    onCancel={() => setIsEditing(false)}
-                    onComplete={handleCropComplete}
-                    fileCount={viewMode === 'album' ? albumImages.length : files.length}
-                    onApplyToAll={viewMode === 'local' && !currentImage?.toLowerCase().endsWith('.repic') ? handleApplyToAll : undefined}
-                    isVirtual={viewMode === 'album' || (viewMode === 'local' && currentImage?.toLowerCase().endsWith('.repic'))}
-                  />
-                </Suspense>
-              </motion.div>
-            )}
-          </AnimatePresence>
         </main>
 
         {/* Right: Info Panel - flex item with width transition */}
@@ -1512,6 +1570,7 @@ function App() {
             onDownloadSelected={handleBatchDownload}
             onUploadSelected={handleBatchUpload}
             onReorder={viewMode === 'album' ? (from, to) => reorderImages(selectedAlbumId, from, to) : undefined}
+            onContextMenu={viewMode === 'album' ? (e, image) => handleImageContextMenu(e, image, selectedAlbum) : undefined}
             position={sidebarPosition}
           />
         )}
@@ -1567,6 +1626,171 @@ function App() {
         onExportComplete={(count) => {
           setToast({ visible: true, message: t('exportSuccess', { count }) });
         }}
+      />
+
+      {/* Custom Confirm Dialog */}
+      <ConfirmDialog {...confirmDialogProps} />
+
+      {/* About Dialog */}
+      <AboutDialog
+        isOpen={showAboutDialog}
+        onClose={() => setShowAboutDialog(false)}
+      />
+
+      {/* Image Editor - Full screen overlay (outside of main layout) */}
+      <AnimatePresence>
+        {isEditing && (localImage || currentAlbumImage) && (
+          <motion.div
+            key="editor"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[200] bg-black"
+          >
+            <Suspense fallback={<div className="flex items-center justify-center h-full"><div className="text-white/60 animate-pulse">Loading editor...</div></div>}>
+              <ImageEditor
+                imageSrc={viewMode === 'album' ? currentAlbumImage : localImage}
+                onCancel={() => setIsEditing(false)}
+                onComplete={handleCropComplete}
+                fileCount={viewMode === 'album' ? albumImages.length : files.length}
+                onApplyToAll={viewMode === 'local' && !currentImage?.toLowerCase().endsWith('.repic') ? handleApplyToAll : undefined}
+                isVirtual={viewMode === 'album' || (viewMode === 'local' && currentImage?.toLowerCase().endsWith('.repic'))}
+              />
+            </Suspense>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Floating Toolbar */}
+      <FloatingToolbar
+        onRefresh={handleRefresh}
+        onToggleEdit={() => setIsEditing(!isEditing)}
+        isEditing={isEditing}
+        onCopy={handleCopy}
+        isCopying={isCopying}
+        onUpload={handleUpload}
+        isUploading={isUploading}
+        onToggleUploadHistory={() => setShowUploadHistory(!showUploadHistory)}
+        uploadHistoryCount={uploadHistory.length}
+        onExportVirtual={() => setShowExportDialog(true)}
+        onDelete={async () => {
+          if (isMultiSelectMode && selectedImageIds?.size > 0) {
+            handleBatchDelete();
+          } else if (viewMode === 'album' && selectedAlbumId && albumImages[safeAlbumIndex]) {
+            const imageToDelete = albumImages[safeAlbumIndex];
+            const confirmed = await confirm(t('deleteImageConfirm'), {
+              title: t('confirmDelete'),
+              confirmText: t('delete'),
+              cancelText: t('cancel'),
+              danger: true
+            });
+            if (confirmed) {
+              removeAlbumImage(selectedAlbumId, imageToDelete.id);
+              setSelectedImageIds(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(imageToDelete.id);
+                return newSet;
+              });
+              if (safeAlbumIndex >= albumImages.length - 1 && safeAlbumIndex > 0) {
+                setAlbumImageIndex(prev => prev - 1);
+              }
+            }
+          } else {
+            handleClear();
+          }
+        }}
+        onSave={handleSave}
+        hasImage={!!(localImage || currentAlbumImage || virtualImageData?.url)}
+        viewMode={viewMode}
+        selectedAlbum={selectedAlbum}
+        isMultiSelectMode={viewMode === 'album' && isMultiSelectMode}
+        selectedImageIds={selectedImageIds}
+      />
+
+      {/* Context Menu */}
+      <ContextMenu
+        isOpen={contextMenu.isOpen}
+        position={contextMenu.position}
+        onClose={closeContextMenu}
+        items={
+          contextMenu.target?.type === 'image' ? [
+            {
+              label: t('copyToClipboard'),
+              icon: Copy,
+              onClick: () => handleCopy()
+            },
+            {
+              label: t('download'),
+              icon: Download,
+              onClick: () => handleSave()
+            },
+            { type: 'separator' },
+            {
+              label: t('exportVirtual'),
+              icon: FolderOutput,
+              onClick: () => {
+                const target = contextMenu.target;
+                if (target?.image) {
+                  handleExportSingle(target.image, target.album);
+                }
+              }
+            },
+            { type: 'separator' },
+            {
+              label: t('delete'),
+              icon: Trash2,
+              danger: true,
+              onClick: async () => {
+                const target = contextMenu.target;
+                if (viewMode === 'album' && selectedAlbumId && target?.image) {
+                  const confirmed = await confirm(t('deleteImageConfirm'), {
+                    title: t('confirmDelete'),
+                    confirmText: t('delete'),
+                    cancelText: t('cancel'),
+                    danger: true
+                  });
+                  if (confirmed) {
+                    removeAlbumImage(selectedAlbumId, target.image.id);
+                  }
+                }
+              }
+            }
+          ]
+          : contextMenu.target?.type === 'album' ? [
+            {
+              label: t('exportVirtual'),
+              icon: FolderOutput,
+              onClick: () => {
+                const album = contextMenu.target?.album;
+                if (album) {
+                  selectAlbum(album.id);
+                  setShowExportDialog(true);
+                }
+              }
+            },
+            { type: 'separator' },
+            {
+              label: t('delete'),
+              icon: Trash2,
+              danger: true,
+              onClick: async () => {
+                const album = contextMenu.target?.album;
+                if (album) {
+                  const confirmed = await confirm(t('deleteAlbumConfirm'), {
+                    title: t('confirmDelete'),
+                    confirmText: t('delete'),
+                    cancelText: t('cancel'),
+                    danger: true
+                  });
+                  if (confirmed) {
+                    deleteAlbum(album.id);
+                  }
+                }
+              }
+            }
+          ]
+          : []
+        }
       />
 
     </div>

@@ -24,3 +24,4 @@ export { Moon } from './Moon';
 export { Upload } from './Upload';
 export { Copy } from './Copy';
 export { Album } from './Album';
+export { Pencil } from './Pencil';

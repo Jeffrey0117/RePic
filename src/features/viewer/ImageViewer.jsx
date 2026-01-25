@@ -1,15 +1,52 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import useI18n from '../../hooks/useI18n';
 import { getCached } from '../../utils/imageLoader';
+import { drawAnnotation } from '../editor/utils/drawingHelpers';
 
 const electronAPI = window.electronAPI || null;
 
-export const ImageViewer = ({ src, crop }) => {
+export const ImageViewer = ({ src, crop, annotations = [] }) => {
     const { t } = useI18n();
     const containerRef = useRef(null);
     const imageRef = useRef(null);
+    const canvasRef = useRef(null);
 
     const [scale, setScale] = useState(1);
+    const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
+
+    // Draw annotations on canvas overlay
+    useEffect(() => {
+        const canvas = canvasRef.current;
+        const img = imageRef.current;
+        if (!canvas || !img || !annotations?.length) return;
+
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
+
+        // Match canvas size to displayed image size
+        const rect = img.getBoundingClientRect();
+        canvas.width = rect.width;
+        canvas.height = rect.height;
+
+        // Clear and redraw
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Convert percentage-based annotations to pixel coordinates and draw
+        annotations.forEach(ann => {
+            if (ann.unit === '%') {
+                const pixelAnn = {
+                    type: ann.type,
+                    x: (ann.x / 100) * canvas.width,
+                    y: (ann.y / 100) * canvas.height,
+                    width: (ann.width / 100) * canvas.width,
+                    height: (ann.height / 100) * canvas.height
+                };
+                drawAnnotation(ctx, pixelAnn);
+            } else {
+                drawAnnotation(ctx, ann);
+            }
+        });
+    }, [annotations, imageSize, scale]);
     const [position, setPosition] = useState({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
@@ -192,37 +229,55 @@ export const ImageViewer = ({ src, crop }) => {
                     <span className="text-base font-medium">暫不支援此來源</span>
                 </div>
             ) : (
-                <img
-                    ref={imageRef}
-                    src={imageSrc}
-                    alt="View"
-                    className={`block select-none rounded-md transition-opacity duration-150 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
-                    style={{
-                        maxWidth: '100%',
-                        maxHeight: '100%',
-                        objectFit: 'contain',
-                        transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
-                        transition: isDragging ? 'none' : 'transform 0.15s ease-out',
-                        ...(crop && {
-                            clipPath: `inset(${crop.y}% ${100 - crop.x - crop.width}% ${100 - crop.y - crop.height}% ${crop.x}%)`
-                        })
-                    }}
-                    draggable={false}
-                    referrerPolicy="no-referrer"
-                    onLoad={() => setIsLoading(false)}
-                    onError={async () => {
-                        // If failed and haven't tried proxy yet
-                        if (src?.startsWith('http') && !proxiedSrc && electronAPI?.proxyImage) {
-                            const result = await electronAPI.proxyImage(src);
-                            if (result.success) {
-                                setProxiedSrc(result.data);
-                                return;
+                <div className="relative" style={{
+                    transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
+                    transition: isDragging ? 'none' : 'transform 0.15s ease-out'
+                }}>
+                    <img
+                        ref={imageRef}
+                        src={imageSrc}
+                        alt="View"
+                        className={`block select-none rounded-md transition-opacity duration-150 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+                        style={{
+                            maxWidth: '100%',
+                            maxHeight: '100%',
+                            objectFit: 'contain',
+                            ...(crop && {
+                                clipPath: `inset(${crop.y}% ${100 - crop.x - crop.width}% ${100 - crop.y - crop.height}% ${crop.x}%)`
+                            })
+                        }}
+                        draggable={false}
+                        referrerPolicy="no-referrer"
+                        onLoad={(e) => {
+                            setIsLoading(false);
+                            setImageSize({ width: e.target.clientWidth, height: e.target.clientHeight });
+                        }}
+                        onError={async () => {
+                            // If failed and haven't tried proxy yet
+                            if (src?.startsWith('http') && !proxiedSrc && electronAPI?.proxyImage) {
+                                const result = await electronAPI.proxyImage(src);
+                                if (result.success) {
+                                    setProxiedSrc(result.data);
+                                    return;
+                                }
                             }
-                        }
-                        setIsLoading(false);
-                        setLoadFailed(true);
-                    }}
-                />
+                            setIsLoading(false);
+                            setLoadFailed(true);
+                        }}
+                    />
+                    {/* Annotations overlay */}
+                    {annotations?.length > 0 && (
+                        <canvas
+                            ref={canvasRef}
+                            className="absolute inset-0 pointer-events-none"
+                            style={{
+                                ...(crop && {
+                                    clipPath: `inset(${crop.y}% ${100 - crop.x - crop.width}% ${100 - crop.y - crop.height}% ${crop.x}%)`
+                                })
+                            }}
+                        />
+                    )}
+                </div>
             )}
         </div>
     );
