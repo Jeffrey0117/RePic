@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense, useCallback, useMemo } from 'react';
+import { useState, useEffect, lazy, Suspense, useCallback, useMemo, useRef } from 'react';
 import { AnimatePresence, motion } from './lib/motion';
 import { Dropzone } from './features/viewer/Dropzone';
 import { ImageViewer } from './features/viewer/ImageViewer';
@@ -93,6 +93,7 @@ function App() {
 
   // Drag-drop state for album mode
   const [isDragOver, setIsDragOver] = useState(false);
+  const dragCounter = useRef(0);
 
   // Export dialog state
   const [showExportDialog, setShowExportDialog] = useState(false);
@@ -206,22 +207,33 @@ function App() {
   }, [viewMode, currentPath, loadFolder]);
 
   // Handle drag-drop for album mode (accept images from web browsers)
-  const handleDragOver = useCallback((e) => {
-    if (viewMode !== 'album' || !selectedAlbumId) return;
+  const handleDragEnter = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsDragOver(true);
+    dragCounter.current++;
+    if (viewMode === 'album' && selectedAlbumId) {
+      setIsDragOver(true);
+    }
   }, [viewMode, selectedAlbumId]);
+
+  const handleDragOver = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
 
   const handleDragLeave = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsDragOver(false);
+    dragCounter.current--;
+    if (dragCounter.current === 0) {
+      setIsDragOver(false);
+    }
   }, []);
 
   const handleDrop = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
+    dragCounter.current = 0;
     setIsDragOver(false);
 
     if (viewMode !== 'album' || !selectedAlbumId) return;
@@ -1078,6 +1090,7 @@ function App() {
   return (
     <div
       className="h-screen w-screen bg-[#0A0A0A] text-white overflow-hidden flex flex-col select-none relative"
+      onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -1115,8 +1128,8 @@ function App() {
                 </svg>
               </motion.div>
               <div className="text-center">
-                <p className="text-xl font-medium text-white">放開以新增圖片</p>
-                <p className="text-sm text-white/60 mt-1">拖曳圖片或網址到此處</p>
+                <p className="text-xl font-semibold text-white drop-shadow-md">放開以新增圖片</p>
+                <p className="text-sm text-white/80 mt-1">拖曳圖片或網址到此處</p>
               </div>
             </motion.div>
           </motion.div>

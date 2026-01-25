@@ -212,18 +212,17 @@ export const TopBar = ({ currentPath, onOpenFolder, onRefresh, isEditing, onTogg
             {/* Right: Actions */}
             <div className="flex items-center gap-2">
                 {/* Always on top toggle */}
-                <Button
-                    variant="ghost"
-                    className={`h-9 w-9 p-0 rounded-lg transition-all ${
+                <button
+                    className={`h-9 w-9 p-0 rounded-lg transition-colors flex items-center justify-center ${
                         isAlwaysOnTop
-                            ? 'bg-primary/20 text-primary'
+                            ? theme === 'dark' ? 'bg-white/20 text-white' : 'bg-black/20 text-gray-800'
                             : `hover:bg-black/10 dark:hover:bg-white/5 ${theme === 'dark' ? 'text-white/70' : 'text-gray-600'}`
                     }`}
                     onClick={toggleAlwaysOnTop}
                     title={isAlwaysOnTop ? t('unpinWindow') : t('pinWindow')}
                 >
                     <Pin size={18} />
-                </Button>
+                </button>
                 <Button
                     variant="ghost"
                     className={`h-9 w-9 p-0 rounded-lg hover:bg-black/10 dark:hover:bg-white/5 ${theme === 'dark' ? 'text-white/70' : 'text-gray-600'}`}
