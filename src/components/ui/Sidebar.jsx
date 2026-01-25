@@ -309,25 +309,25 @@ export const Sidebar = ({
         >
             {/* Toolbar for album mode */}
             {mode === 'web' && (
-                <div className={`flex-shrink-0 px-2 py-2 ${isHorizontal ? 'border-r' : 'border-b'} border-white/5`}>
+                <div className={`flex-shrink-0 ${isHorizontal ? 'border-r py-2 px-1 flex flex-col justify-center' : 'border-b px-2 py-2'} border-white/5`}>
                     {isMultiSelectMode ? (
-                        <div className="flex flex-col gap-1">
-                            <div className="flex items-center justify-between">
+                        <div className={`flex ${isHorizontal ? 'flex-col items-center gap-2' : 'flex-col gap-1'}`}>
+                            <div className={`flex items-center ${isHorizontal ? 'flex-col gap-1' : 'justify-between w-full'}`}>
+                                <span className="text-[10px] text-white/60">
+                                    {selectedIds.size} 選中
+                                </span>
                                 <button
                                     onClick={onExitMultiSelect}
                                     className="text-[10px] text-white/60 hover:text-white px-2 py-1 rounded hover:bg-white/10"
                                 >
                                     ✕
                                 </button>
-                                <span className="text-[10px] text-white/60">
-                                    {selectedIds.size} 選中
-                                </span>
                             </div>
-                            <div className="flex items-center gap-1">
+                            <div className={`flex ${isHorizontal ? 'flex-col' : 'flex-row'} items-center gap-1`}>
                                 <button
                                     onClick={onDownloadSelected}
                                     disabled={selectedIds.size === 0}
-                                    className="flex-1 text-[10px] text-blue-400 hover:text-blue-300 px-1 py-1 rounded hover:bg-blue-500/20 disabled:opacity-30 disabled:cursor-not-allowed"
+                                    className="text-[10px] text-blue-400 hover:text-blue-300 px-2 py-1 rounded hover:bg-blue-500/20 disabled:opacity-30 disabled:cursor-not-allowed"
                                     title="下載"
                                 >
                                     ↓
@@ -335,7 +335,7 @@ export const Sidebar = ({
                                 <button
                                     onClick={onUploadSelected}
                                     disabled={selectedIds.size === 0}
-                                    className="flex-1 text-[10px] text-green-400 hover:text-green-300 px-1 py-1 rounded hover:bg-green-500/20 disabled:opacity-30 disabled:cursor-not-allowed"
+                                    className="text-[10px] text-green-400 hover:text-green-300 px-2 py-1 rounded hover:bg-green-500/20 disabled:opacity-30 disabled:cursor-not-allowed"
                                     title="上傳"
                                 >
                                     ↑
@@ -343,7 +343,7 @@ export const Sidebar = ({
                                 <button
                                     onClick={onDeleteSelected}
                                     disabled={selectedIds.size === 0}
-                                    className="flex-1 text-[10px] text-red-400 hover:text-red-300 px-1 py-1 rounded hover:bg-red-500/20 disabled:opacity-30 disabled:cursor-not-allowed"
+                                    className="text-[10px] text-red-400 hover:text-red-300 px-2 py-1 rounded hover:bg-red-500/20 disabled:opacity-30 disabled:cursor-not-allowed"
                                     title="刪除"
                                 >
                                     ✕
@@ -351,8 +351,8 @@ export const Sidebar = ({
                             </div>
                         </div>
                     ) : isReorderMode ? (
-                        <div className="flex items-center justify-between">
-                            <span className="text-[10px] text-yellow-400">拖曳排序中</span>
+                        <div className={`flex ${isHorizontal ? 'flex-col items-center gap-2' : 'items-center justify-between'}`}>
+                            <span className="text-[10px] text-yellow-400">排序中</span>
                             <button
                                 onClick={() => setIsReorderMode(false)}
                                 className="text-[10px] text-white/60 hover:text-white px-2 py-1 rounded hover:bg-white/10"
@@ -361,17 +361,17 @@ export const Sidebar = ({
                             </button>
                         </div>
                     ) : (
-                        <div className="flex items-center gap-1">
+                        <div className={`flex ${isHorizontal ? 'flex-col' : 'flex-row'} items-center gap-1`}>
                             <button
                                 onClick={onEnterMultiSelect}
-                                className="flex-1 text-[10px] text-white/50 hover:text-white/80 py-1 rounded hover:bg-white/5 transition-colors"
+                                className={`text-[10px] text-white/50 hover:text-white/80 py-1 px-2 rounded hover:bg-white/5 transition-colors ${isHorizontal ? '' : 'flex-1'}`}
                             >
                                 多選
                             </button>
                             {onReorder && (
                                 <button
                                     onClick={() => setIsReorderMode(true)}
-                                    className="flex-1 text-[10px] text-white/50 hover:text-white/80 py-1 rounded hover:bg-white/5 transition-colors"
+                                    className={`text-[10px] text-white/50 hover:text-white/80 py-1 px-2 rounded hover:bg-white/5 transition-colors ${isHorizontal ? '' : 'flex-1'}`}
                                 >
                                     排序
                                 </button>
