@@ -6,9 +6,13 @@ import { preloadImages, getCached } from '../../utils/imageLoader';
 import { LazyImage } from './LazyImage';
 
 const SIDEBAR_WIDTH_KEY = 'sidebar-width';
+const SIDEBAR_HEIGHT_KEY = 'sidebar-height';
 const MIN_WIDTH = 80;
 const MAX_WIDTH = 200;
 const DEFAULT_WIDTH = 120;
+const MIN_HEIGHT = 120;
+const MAX_HEIGHT = 300;
+const DEFAULT_HEIGHT = 160;
 
 const electronAPI = window.electronAPI || null;
 
@@ -54,6 +58,7 @@ export const Sidebar = ({
     const [failedImages, setFailedImages] = useState(new Set());
     // Cached thumbnails for local files
     const [cachedThumbs, setCachedThumbs] = useState({});
+    // Separate width (for left) and height (for bottom)
     const [width, setWidth] = useState(() => {
         const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
         if (saved) {
@@ -63,6 +68,16 @@ export const Sidebar = ({
             }
         }
         return DEFAULT_WIDTH;
+    });
+    const [height, setHeight] = useState(() => {
+        const saved = localStorage.getItem(SIDEBAR_HEIGHT_KEY);
+        if (saved) {
+            const parsed = parseInt(saved, 10);
+            if (!isNaN(parsed) && parsed >= MIN_HEIGHT && parsed <= MAX_HEIGHT) {
+                return parsed;
+            }
+        }
+        return DEFAULT_HEIGHT;
     });
     const [isResizing, setIsResizing] = useState(false);
 
@@ -132,12 +147,15 @@ export const Sidebar = ({
         };
     }, [isDragScrolling, dragScrollStart, isHorizontal]);
 
+    // Calculate thumbnail size based on position
+    const thumbSize = isHorizontal ? height - 60 : width - 24; // Leave room for labels
+
     // Scroll to current item when it changes
     useEffect(() => {
         const container = scrollContainerRef.current;
         if (!container || currentIndex < 0) return;
 
-        const itemSize = width - 24 + 12; // thumbnail size + gap
+        const itemSize = thumbSize + 12; // thumbnail size + gap
         const scrollPos = currentIndex * itemSize;
 
         if (isHorizontal) {
@@ -149,7 +167,7 @@ export const Sidebar = ({
             const targetScroll = scrollPos - containerHeight / 2 + itemSize / 2;
             container.scrollTo({ top: Math.max(0, targetScroll), behavior: 'smooth' });
         }
-    }, [currentIndex, width, isHorizontal]);
+    }, [currentIndex, thumbSize, isHorizontal]);
 
     const handleResizeMouseDown = useCallback((e) => {
         e.preventDefault();
@@ -160,19 +178,22 @@ export const Sidebar = ({
         if (!isResizing) return;
 
         const handleMouseMove = (e) => {
-            let newWidth;
             if (isHorizontal) {
-                // For bottom sidebar, calculate height from bottom of window
-                newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, window.innerHeight - e.clientY));
+                const newHeight = Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, window.innerHeight - e.clientY));
+                setHeight(newHeight);
             } else {
-                newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, e.clientX));
+                const newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, e.clientX));
+                setWidth(newWidth);
             }
-            setWidth(newWidth);
         };
 
         const handleMouseUp = () => {
             setIsResizing(false);
-            localStorage.setItem(SIDEBAR_WIDTH_KEY, width.toString());
+            if (isHorizontal) {
+                localStorage.setItem(SIDEBAR_HEIGHT_KEY, height.toString());
+            } else {
+                localStorage.setItem(SIDEBAR_WIDTH_KEY, width.toString());
+            }
         };
 
         document.addEventListener('mousemove', handleMouseMove);
@@ -284,7 +305,7 @@ export const Sidebar = ({
                     ? 'w-full border-t border-white/5 flex flex-row'
                     : 'h-full border-r border-white/5 flex flex-col'
             }`}
-            style={isHorizontal ? { height: `${width}px` } : { width: `${width}px` }}
+            style={isHorizontal ? { height: `${height}px` } : { width: `${width}px` }}
         >
             {/* Toolbar for album mode */}
             {mode === 'web' && (
@@ -467,7 +488,7 @@ export const Sidebar = ({
                                     ${isSelected ? 'border-green-500 ring-2 ring-green-500/30' : isActive ? 'border-primary ring-2 ring-primary/20 scale-105' : 'border-transparent group-hover:border-white/30'}
                                     ${isDragOver ? 'border-primary border-dashed' : ''}
                                 `}
-                                style={{ width: `${width - 24}px`, height: `${width - 24}px` }}
+                                style={{ width: `${thumbSize}px`, height: `${thumbSize}px` }}
                                 draggable={!isMultiSelectMode && !canReorder}
                                 onDragStart={(e) => {
                                     if (!canReorder) {
