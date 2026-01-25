@@ -229,21 +229,26 @@ export const ImageViewer = ({ src, crop, annotations = [] }) => {
                     <span className="text-base font-medium">暫不支援此來源</span>
                 </div>
             ) : (
-                <div className="relative" style={{
-                    transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
-                    transition: isDragging ? 'none' : 'transform 0.15s ease-out'
-                }}>
+                <div
+                    className="relative rounded-md"
+                    style={{
+                        transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
+                        transition: isDragging ? 'none' : 'transform 0.15s ease-out',
+                    }}
+                >
                     <img
                         ref={imageRef}
                         src={imageSrc}
                         alt="View"
-                        className={`block select-none rounded-md transition-opacity duration-150 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+                        className={`block select-none transition-opacity duration-150 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
                         style={{
-                            maxWidth: '100%',
-                            maxHeight: '100%',
-                            objectFit: 'contain',
+                            maxWidth: 'calc(100vw - 280px)',
+                            maxHeight: 'calc(100vh - 160px)',
+                            objectFit: crop ? 'none' : 'contain',
                             ...(crop && {
-                                clipPath: `inset(${crop.y}% ${100 - crop.x - crop.width}% ${100 - crop.y - crop.height}% ${crop.x}%)`
+                                // Use object-view-box to show only crop region (centered & scaled)
+                                objectViewBox: `inset(${crop.y}% ${100 - crop.x - crop.width}% ${100 - crop.y - crop.height}% ${crop.x}%)`,
+                                objectFit: 'contain',
                             })
                         }}
                         draggable={false}
@@ -272,7 +277,7 @@ export const ImageViewer = ({ src, crop, annotations = [] }) => {
                             className="absolute inset-0 pointer-events-none"
                             style={{
                                 ...(crop && {
-                                    clipPath: `inset(${crop.y}% ${100 - crop.x - crop.width}% ${100 - crop.y - crop.height}% ${crop.x}%)`
+                                    objectViewBox: `inset(${crop.y}% ${100 - crop.x - crop.width}% ${100 - crop.y - crop.height}% ${crop.x}%)`,
                                 })
                             }}
                         />
