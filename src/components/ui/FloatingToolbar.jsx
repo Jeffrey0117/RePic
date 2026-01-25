@@ -87,6 +87,7 @@ export const FloatingToolbar = ({
     <AnimatePresence>
       {isVisible && (
         <motion.div
+          key="floating-toolbar"
           ref={toolbarRef}
           initial={{ y: 16, opacity: 0, scale: 0.92 }}
           animate={{
