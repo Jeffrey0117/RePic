@@ -199,6 +199,7 @@ export const loadImage = (url, priority = PRIORITY_NORMAL) => {
  * Load thumbnail only (much faster for sidebar)
  * Returns cached thumbnail immediately if available
  * Otherwise loads full image and generates thumbnail
+ * Falls back to full image if thumbnail generation fails (e.g., GIFs)
  */
 export const loadThumbnail = async (url) => {
   if (!url || !url.startsWith('http')) {
@@ -223,10 +224,11 @@ export const loadThumbnail = async (url) => {
 
   // No thumbnail cached, need to load full image first
   // This will also generate thumbnail
-  await loadImage(url, PRIORITY_NORMAL);
+  const fullImage = await loadImage(url, PRIORITY_NORMAL);
 
-  // Return thumbnail (should be available now)
-  return thumbCache.get(url) || null;
+  // Return thumbnail if available, otherwise fall back to full image
+  // This handles cases like GIFs where thumbnail generation might fail
+  return thumbCache.get(url) || fullImage;
 };
 
 /**
