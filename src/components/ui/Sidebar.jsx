@@ -39,11 +39,17 @@ export const Sidebar = ({
     position = 'left' // 'left' or 'bottom'
 }) => {
     const isHorizontal = position === 'bottom';
+    const scrollContainerRef = useRef(null);
     // Cache for .repic file data (url + crop)
     const [repicData, setRepicData] = useState({});
+    // Reorder mode (separate from multi-select)
+    const [isReorderMode, setIsReorderMode] = useState(false);
     // Drag reorder state
     const [dragIndex, setDragIndex] = useState(null);
     const [dragOverIndex, setDragOverIndex] = useState(null);
+    // Drag scroll state
+    const [isDragScrolling, setIsDragScrolling] = useState(false);
+    const [dragScrollStart, setDragScrollStart] = useState({ x: 0, y: 0, scrollX: 0, scrollY: 0 });
     // Track failed images (after proxy also failed)
     const [failedImages, setFailedImages] = useState(new Set());
     // Cached thumbnails for local files
@@ -60,7 +66,92 @@ export const Sidebar = ({
     });
     const [isResizing, setIsResizing] = useState(false);
 
-    const handleMouseDown = useCallback((e) => {
+    // Keyboard navigation
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            // Skip if focus is on input
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+            const isNext = isHorizontal ? e.key === 'ArrowRight' : e.key === 'ArrowDown';
+            const isPrev = isHorizontal ? e.key === 'ArrowLeft' : e.key === 'ArrowUp';
+
+            if (isNext && currentIndex < files.length - 1) {
+                e.preventDefault();
+                onSelect(currentIndex + 1);
+            } else if (isPrev && currentIndex > 0) {
+                e.preventDefault();
+                onSelect(currentIndex - 1);
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isHorizontal, currentIndex, files.length, onSelect]);
+
+    // Drag to scroll (carousel effect)
+    const handleScrollDragStart = useCallback((e) => {
+        if (isReorderMode || isMultiSelectMode) return;
+        const container = scrollContainerRef.current;
+        if (!container) return;
+
+        setIsDragScrolling(true);
+        setDragScrollStart({
+            x: e.clientX,
+            y: e.clientY,
+            scrollX: container.scrollLeft,
+            scrollY: container.scrollTop
+        });
+    }, [isReorderMode, isMultiSelectMode]);
+
+    useEffect(() => {
+        if (!isDragScrolling) return;
+
+        const handleMouseMove = (e) => {
+            const container = scrollContainerRef.current;
+            if (!container) return;
+
+            if (isHorizontal) {
+                const dx = dragScrollStart.x - e.clientX;
+                container.scrollLeft = dragScrollStart.scrollX + dx;
+            } else {
+                const dy = dragScrollStart.y - e.clientY;
+                container.scrollTop = dragScrollStart.scrollY + dy;
+            }
+        };
+
+        const handleMouseUp = () => {
+            setIsDragScrolling(false);
+        };
+
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+
+        return () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, [isDragScrolling, dragScrollStart, isHorizontal]);
+
+    // Scroll to current item when it changes
+    useEffect(() => {
+        const container = scrollContainerRef.current;
+        if (!container || currentIndex < 0) return;
+
+        const itemSize = width - 24 + 12; // thumbnail size + gap
+        const scrollPos = currentIndex * itemSize;
+
+        if (isHorizontal) {
+            const containerWidth = container.clientWidth;
+            const targetScroll = scrollPos - containerWidth / 2 + itemSize / 2;
+            container.scrollTo({ left: Math.max(0, targetScroll), behavior: 'smooth' });
+        } else {
+            const containerHeight = container.clientHeight;
+            const targetScroll = scrollPos - containerHeight / 2 + itemSize / 2;
+            container.scrollTo({ top: Math.max(0, targetScroll), behavior: 'smooth' });
+        }
+    }, [currentIndex, width, isHorizontal]);
+
+    const handleResizeMouseDown = useCallback((e) => {
         e.preventDefault();
         setIsResizing(true);
     }, []);
@@ -188,16 +279,16 @@ export const Sidebar = ({
 
     return (
         <div
-            className={`bg-surface/30 backdrop-blur-xl overflow-hidden relative transition-all duration-300 ease-out ${
+            className={`bg-surface/30 backdrop-blur-xl overflow-hidden relative transition-all duration-300 ease-out flex-shrink-0 ${
                 isHorizontal
                     ? 'w-full border-t border-white/5 flex flex-row'
                     : 'h-full border-r border-white/5 flex flex-col'
             }`}
             style={isHorizontal ? { height: `${width}px` } : { width: `${width}px` }}
         >
-            {/* Multi-select toolbar for album mode */}
+            {/* Toolbar for album mode */}
             {mode === 'web' && (
-                <div className="flex-shrink-0 px-2 py-2 border-b border-white/5">
+                <div className={`flex-shrink-0 px-2 py-2 ${isHorizontal ? 'border-r' : 'border-b'} border-white/5`}>
                     {isMultiSelectMode ? (
                         <div className="flex flex-col gap-1">
                             <div className="flex items-center justify-between">
@@ -238,22 +329,46 @@ export const Sidebar = ({
                                 </button>
                             </div>
                         </div>
+                    ) : isReorderMode ? (
+                        <div className="flex items-center justify-between">
+                            <span className="text-[10px] text-yellow-400">拖曳排序中</span>
+                            <button
+                                onClick={() => setIsReorderMode(false)}
+                                className="text-[10px] text-white/60 hover:text-white px-2 py-1 rounded hover:bg-white/10"
+                            >
+                                完成
+                            </button>
+                        </div>
                     ) : (
-                        <button
-                            onClick={onEnterMultiSelect}
-                            className="w-full text-[10px] text-white/50 hover:text-white/80 py-1 rounded hover:bg-white/5 transition-colors"
-                        >
-                            多選
-                        </button>
+                        <div className="flex items-center gap-1">
+                            <button
+                                onClick={onEnterMultiSelect}
+                                className="flex-1 text-[10px] text-white/50 hover:text-white/80 py-1 rounded hover:bg-white/5 transition-colors"
+                            >
+                                多選
+                            </button>
+                            {onReorder && (
+                                <button
+                                    onClick={() => setIsReorderMode(true)}
+                                    className="flex-1 text-[10px] text-white/50 hover:text-white/80 py-1 rounded hover:bg-white/5 transition-colors"
+                                >
+                                    排序
+                                </button>
+                            )}
+                        </div>
                     )}
                 </div>
             )}
 
-            <div className={`flex-1 no-scrollbar ${
-                isHorizontal
-                    ? 'overflow-x-auto overflow-y-hidden px-4 py-2 flex flex-row gap-3'
-                    : 'overflow-y-auto py-4 px-2 space-y-3'
-            }`}>
+            <div
+                ref={scrollContainerRef}
+                onMouseDown={handleScrollDragStart}
+                className={`flex-1 no-scrollbar select-none ${
+                    isHorizontal
+                        ? 'overflow-x-auto overflow-y-hidden px-4 py-2 flex flex-row gap-3 items-center'
+                        : 'overflow-y-auto py-4 px-2 space-y-3'
+                } ${isDragScrolling ? 'cursor-grabbing' : 'cursor-grab'}`}
+            >
                 {files.map((file, index) => {
                     const isActive = index === currentIndex;
                     // For local mode: file is a path, extract filename
@@ -293,8 +408,8 @@ export const Sidebar = ({
                     const imageId = isWeb && typeof file === 'object' ? file.id : null;
                     const isSelected = imageId && selectedIds.has(imageId);
 
-                    // Drag reorder handlers (for album mode)
-                    const canReorder = isWeb && onReorder && !isMultiSelectMode;
+                    // Drag reorder handlers (for album mode, only when reorder mode is active)
+                    const canReorder = isWeb && onReorder && isReorderMode && !isMultiSelectMode;
                     const isDragging = dragIndex === index;
                     const isDragOver = dragOverIndex === index;
 
@@ -421,7 +536,7 @@ export const Sidebar = ({
 
             {/* Resize Handle */}
             <div
-                onMouseDown={handleMouseDown}
+                onMouseDown={handleResizeMouseDown}
                 className={`
                     absolute transition-colors duration-150
                     ${isHorizontal

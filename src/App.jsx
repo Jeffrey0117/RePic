@@ -1132,7 +1132,7 @@ function App() {
       {/* 2. Main Content Area */}
       <div className={`flex-1 overflow-hidden flex transition-all duration-300 ${sidebarPosition === 'bottom' ? 'flex-col' : 'flex-row'}`}>
         {/* Horizontal row: AlbumSidebar + (Sidebar if left) + main + InfoPanel */}
-        <div className="flex flex-row flex-1 min-h-0 overflow-hidden">
+        <div className={`flex flex-row min-h-0 overflow-hidden ${sidebarPosition === 'bottom' ? 'flex-1' : 'flex-1'}`}>
           {/* Album Sidebar - only in album mode */}
           {viewMode === 'album' && (
             <AlbumSidebar
