@@ -1,6 +1,86 @@
-const { app, BrowserWindow, Menu, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, dialog, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
+const https = require('https');
+const http = require('http');
+
+// Temp directory for drag & drop
+const TEMP_DIR = path.join(os.tmpdir(), 'repic-temp');
+const TEMP_EXPIRY_MS = 60 * 60 * 1000; // 1 hour
+
+// Ensure temp directory exists
+function ensureTempDir() {
+    if (!fs.existsSync(TEMP_DIR)) {
+        fs.mkdirSync(TEMP_DIR, { recursive: true });
+    }
+}
+
+// Clean up expired temp files
+function cleanupTempFiles() {
+    try {
+        if (!fs.existsSync(TEMP_DIR)) return;
+        const files = fs.readdirSync(TEMP_DIR);
+        const now = Date.now();
+        for (const file of files) {
+            const filePath = path.join(TEMP_DIR, file);
+            const stats = fs.statSync(filePath);
+            if (now - stats.mtimeMs > TEMP_EXPIRY_MS) {
+                fs.unlinkSync(filePath);
+                console.log('[cleanup] Deleted expired temp file:', file);
+            }
+        }
+    } catch (e) {
+        console.error('[cleanup] Error:', e);
+    }
+}
+
+// Download image from URL to temp file
+function downloadToTemp(url) {
+    return new Promise((resolve, reject) => {
+        ensureTempDir();
+
+        // Generate temp filename
+        const urlObj = new URL(url);
+        const ext = path.extname(urlObj.pathname) || '.png';
+        const filename = `drag-${Date.now()}${ext}`;
+        const tempPath = path.join(TEMP_DIR, filename);
+
+        const protocol = url.startsWith('https') ? https : http;
+
+        const request = protocol.get(url, (response) => {
+            // Follow redirects
+            if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+                downloadToTemp(response.headers.location).then(resolve).catch(reject);
+                return;
+            }
+
+            if (response.statusCode !== 200) {
+                reject(new Error(`HTTP ${response.statusCode}`));
+                return;
+            }
+
+            const fileStream = fs.createWriteStream(tempPath);
+            response.pipe(fileStream);
+
+            fileStream.on('finish', () => {
+                fileStream.close();
+                resolve(tempPath);
+            });
+
+            fileStream.on('error', (err) => {
+                fs.unlink(tempPath, () => {});
+                reject(err);
+            });
+        });
+
+        request.on('error', reject);
+        request.setTimeout(30000, () => {
+            request.destroy();
+            reject(new Error('Download timeout'));
+        });
+    });
+}
 
 // V8 Startup Optimization
 app.commandLine.appendSwitch('js-flags', '--max-old-space-size=256');
@@ -283,6 +363,45 @@ function setupIpcHandlers() {
         }
     });
 
+    // Start drag operation
+    ipcMain.handle('start-drag', async (event, { imageSrc, fileName }) => {
+        try {
+            let filePath;
+
+            if (imageSrc.startsWith('file://')) {
+                // Local file - use directly
+                filePath = imageSrc.replace('file://', '').split('?')[0];
+            } else if (imageSrc.startsWith('http')) {
+                // Web image - download to temp
+                filePath = await downloadToTemp(imageSrc);
+            } else if (imageSrc.startsWith('data:')) {
+                // Base64 - save to temp
+                ensureTempDir();
+                const ext = imageSrc.includes('png') ? '.png' : '.jpg';
+                const tempPath = path.join(TEMP_DIR, `drag-${Date.now()}${ext}`);
+                const base64Content = imageSrc.split(',')[1];
+                fs.writeFileSync(tempPath, Buffer.from(base64Content, 'base64'));
+                filePath = tempPath;
+            } else {
+                return { success: false, error: 'Unsupported image source' };
+            }
+
+            // Create drag icon (thumbnail)
+            const icon = nativeImage.createFromPath(filePath).resize({ width: 64, height: 64 });
+
+            // Start the drag
+            event.sender.startDrag({
+                file: filePath,
+                icon: icon
+            });
+
+            return { success: true };
+        } catch (e) {
+            console.error('[start-drag] Error:', e);
+            return { success: false, error: e.message };
+        }
+    });
+
     // Batch crop - save cropped image data to file
     ipcMain.handle('batch-crop-save', async (event, { filePath, base64Data, outputMode, originalPath, customDir }) => {
         console.log('[batch-crop-save] Received:', { filePath, outputMode, originalPath, customDir, hasBase64: !!base64Data });
@@ -342,6 +461,9 @@ function setupIpcHandlers() {
 app.whenReady().then(() => {
     // Get file from command line (for file association)
     fileToOpen = getFileFromArgs();
+
+    // Clean up old temp files on startup
+    cleanupTempFiles();
 
     setupIpcHandlers();
     createWindow();

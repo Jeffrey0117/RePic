@@ -117,12 +117,21 @@ export const Sidebar = ({ files, currentIndex, onSelect, cacheVersion = 0, mode 
                                     ${isActive ? 'border-primary ring-2 ring-primary/20 scale-105' : 'border-transparent group-hover:border-white/30'}
                                 `}
                                 style={{ width: `${width - 24}px`, height: `${width - 24}px` }}
+                                draggable
+                                onDragStart={(e) => {
+                                    e.preventDefault();
+                                    // Use Electron's native drag for system-level drag
+                                    if (electronAPI?.startDrag) {
+                                        electronAPI.startDrag(imgSrc, fileName);
+                                    }
+                                }}
                             >
                                 <img
                                     src={imgSrc}
                                     alt=""
-                                    className="w-full h-full object-contain"
+                                    className="w-full h-full object-contain pointer-events-none"
                                     loading="lazy"
+                                    draggable={false}
                                 />
                             </div>
 

@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import useI18n from '../../hooks/useI18n';
 
+const electronAPI = window.electronAPI || null;
+
 export const ImageViewer = ({ src }) => {
     const { t } = useI18n();
     const containerRef = useRef(null);
@@ -108,11 +110,26 @@ export const ImageViewer = ({ src }) => {
         return 'default';
     };
 
+    // Handle drag start for system-level drag (only when not zoomed)
+    const handleDragStart = useCallback((e) => {
+        if (scale > 1) {
+            e.preventDefault();
+            return;
+        }
+        e.preventDefault();
+        // Use Electron's native drag for system-level drag
+        if (electronAPI?.startDrag && src) {
+            electronAPI.startDrag(src);
+        }
+    }, [scale, src]);
+
     return (
         <div
             ref={containerRef}
             onDoubleClick={handleDoubleClick}
             onMouseDown={handleMouseDown}
+            draggable={scale <= 1}
+            onDragStart={handleDragStart}
             className="w-full h-full flex items-center justify-center overflow-hidden relative bg-transparent"
             style={{ cursor: getCursor() }}
         >

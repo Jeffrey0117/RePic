@@ -203,5 +203,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
             return { success: false, error: 'Invalid folder path' };
         }
         return await ipcRenderer.invoke('write-repic-files-batch', { folderPath, files });
+    },
+
+    // Start drag operation (for dragging images to other apps)
+    startDrag: async (imageSrc, fileName) => {
+        if (!imageSrc || typeof imageSrc !== 'string') {
+            return { success: false, error: 'Invalid image source' };
+        }
+        return await ipcRenderer.invoke('start-drag', { imageSrc, fileName });
     }
 });
