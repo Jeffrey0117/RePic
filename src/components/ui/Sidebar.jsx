@@ -448,9 +448,13 @@ export const Sidebar = ({
                                         />
                                     </>
                                 ) : (
-                                    <div className="w-full h-full flex items-center justify-center bg-black/20">
-                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white/80 rounded-full animate-spin" />
-                                    </div>
+                                    // Loading spinner only for web images or .repic files loading
+                                    // Regular local files should always have imgSrc
+                                    (isWeb || isRepic) ? (
+                                        <div className="w-full h-full flex items-center justify-center bg-black/20">
+                                            <div className="w-4 h-4 border-2 border-white/30 border-t-white/80 rounded-full animate-spin" />
+                                        </div>
+                                    ) : null
                                 )}
                                 {/* Selection checkbox indicator */}
                                 {isMultiSelectMode && imageId && (
