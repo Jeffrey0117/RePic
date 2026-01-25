@@ -90,6 +90,7 @@ function App() {
 
   // Sync file system image with local view only when currentImage or cacheVersion changes
   useEffect(() => {
+    console.log('[App useEffect] Triggered - currentImage:', currentImage, 'currentIndex:', currentIndex, 'cacheVersion:', cacheVersion);
     if (currentImage) {
       // Check if it's a .repic virtual image file
       if (currentImage.toLowerCase().endsWith('.repic')) {

@@ -118,7 +118,10 @@ export const Sidebar = ({ files, currentIndex, onSelect, cacheVersion = 0, mode 
                             key={isWeb ? (typeof file === 'string' ? file : file.id) : `${file}-${cacheVersion}`}
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
-                            onClick={() => onSelect(index)}
+                            onClick={() => {
+                                console.log('[Sidebar] Clicked index:', index, 'file:', file, 'fileName:', fileName);
+                                onSelect(index);
+                            }}
                             className={`relative cursor-pointer group flex flex-col items-center`}
                         >
                             <div className="text-[10px] text-white/40 truncate w-full mb-1 text-center group-hover:text-white/80 transition-colors">
@@ -148,6 +151,8 @@ export const Sidebar = ({ files, currentIndex, onSelect, cacheVersion = 0, mode 
                                         style={clipPath ? { clipPath } : undefined}
                                         loading="lazy"
                                         draggable={false}
+                                        referrerPolicy="no-referrer"
+                                        crossOrigin="anonymous"
                                     />
                                 ) : (
                                     <div className="w-full h-full flex items-center justify-center text-white/20 text-xs">

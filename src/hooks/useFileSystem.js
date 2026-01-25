@@ -88,7 +88,9 @@ export const useFileSystem = () => {
     }, [files]);
 
     const selectImage = useCallback((index) => {
+        console.log('[useFileSystem] selectImage called with index:', index, 'files.length:', files.length);
         if (index >= 0 && index < files.length) {
+            console.log('[useFileSystem] Setting currentIndex to:', index, 'file will be:', files[index]);
             setCurrentIndex(index);
         }
     }, [files]);

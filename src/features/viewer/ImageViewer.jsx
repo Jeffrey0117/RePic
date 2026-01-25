@@ -174,6 +174,8 @@ export const ImageViewer = ({ src, crop }) => {
                     })
                 }}
                 draggable={false}
+                referrerPolicy="no-referrer"
+                crossOrigin="anonymous"
             />
         </div>
     );

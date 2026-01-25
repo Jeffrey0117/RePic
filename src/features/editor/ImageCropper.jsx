@@ -106,6 +106,8 @@ export const ImageCropper = ({ imageSrc, onCancel, onComplete, fileCount = 1, on
                                 maxHeight: 'calc(100vh - 200px)',
                                 display: 'block'
                             }}
+                            referrerPolicy="no-referrer"
+                            crossOrigin="anonymous"
                         />
                     </ReactCrop>
 
