@@ -8,7 +8,7 @@ import { Layers } from '../../components/icons';
 import useI18n from '../../hooks/useI18n';
 import { useTheme } from '../../contexts/ThemeContext';
 
-export const ImageCropper = ({ imageSrc, onCancel, onComplete, fileCount = 1, onApplyToAll }) => {
+export const ImageCropper = ({ imageSrc, onCancel, onComplete, fileCount = 1, onApplyToAll, isVirtual = false }) => {
     const { t } = useI18n();
     const { theme } = useTheme();
     const isDark = theme === 'dark';
@@ -42,7 +42,24 @@ export const ImageCropper = ({ imageSrc, onCancel, onComplete, fileCount = 1, on
     };
 
     const handleSave = async () => {
-        console.log('[ImageCropper] handleSave', { completedCrop, imgRef: imgRef.current });
+        console.log('[ImageCropper] handleSave', { completedCrop, imgRef: imgRef.current, isVirtual });
+
+        // For virtual images, return crop parameters instead of generating image
+        if (isVirtual && crop) {
+            console.log('[ImageCropper] Virtual mode - returning crop params:', crop);
+            onComplete({
+                type: 'crop-params',
+                crop: {
+                    x: crop.x,
+                    y: crop.y,
+                    width: crop.width,
+                    height: crop.height,
+                    unit: '%'
+                }
+            });
+            return;
+        }
+
         if (completedCrop && imgRef.current) {
             try {
                 const croppedImage = await getCroppedImg(

@@ -122,6 +122,38 @@ export const useWebAlbums = () => {
     ));
   }, []);
 
+  // Update image crop parameters (for virtual image cropping)
+  const updateImageCrop = useCallback((albumId, imageId, crop) => {
+    setAlbums(prev => prev.map(album =>
+      album.id === albumId
+        ? {
+            ...album,
+            images: album.images.map(img =>
+              img.id === imageId
+                ? { ...img, crop }
+                : img
+            )
+          }
+        : album
+    ));
+  }, []);
+
+  // Clear image crop (reset to original)
+  const clearImageCrop = useCallback((albumId, imageId) => {
+    setAlbums(prev => prev.map(album =>
+      album.id === albumId
+        ? {
+            ...album,
+            images: album.images.map(img =>
+              img.id === imageId
+                ? { ...img, crop: undefined }
+                : img
+            )
+          }
+        : album
+    ));
+  }, []);
+
   // Select album
   const selectAlbum = useCallback((albumId) => {
     setSelectedAlbumId(albumId);
@@ -137,7 +169,9 @@ export const useWebAlbums = () => {
     deleteAlbum,
     addImage,
     addImages,
-    removeImage
+    removeImage,
+    updateImageCrop,
+    clearImageCrop
   };
 };
 

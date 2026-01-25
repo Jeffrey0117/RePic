@@ -153,7 +153,7 @@ export const TopBar = ({ currentPath, onOpenFolder, isEditing, onToggleEdit, onC
                 <ToolButton icon={Album} title={t('webAlbum')} onClick={onToggleViewMode} active={viewMode === 'album'} theme={theme} />
                 <div className={`w-px h-6 mx-1 ${theme === 'dark' ? 'bg-white/10' : 'bg-black/10'}`} />
                 <ToolButton icon={RotateCcw} title={t('refresh')} onClick={() => window.location.reload()} theme={theme} />
-                <ToolButton icon={Scissors} title={t('editArea')} onClick={onToggleEdit} active={isEditing} disabled={viewMode === 'album'} theme={theme} />
+                <ToolButton icon={Scissors} title={t('editArea')} onClick={onToggleEdit} active={isEditing} disabled={!hasImage} theme={theme} />
                 <ToolButton icon={Copy} title={t('copyToClipboard')} onClick={onCopy} disabled={isCopying || !hasImage} loading={isCopying} theme={theme} />
                 <ToolButton icon={Upload} title={t('upload')} onClick={onUpload} disabled={isUploading || viewMode === 'album'} loading={isUploading} theme={theme} />
                 <ToolButton icon={Layers} title={t('uploadHistory')} onClick={onToggleUploadHistory} badge={uploadHistoryCount} theme={theme} />

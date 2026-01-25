@@ -108,5 +108,6 @@
   "copyToClipboard": "複製到剪貼簿",
   "noImageToCopy": "沒有圖片可複製",
   "copySuccess": "已複製到剪貼簿！",
-  "copyFailed": "複製失敗"
+  "copyFailed": "複製失敗",
+  "cropSaved": "裁切範圍已儲存！"
 }

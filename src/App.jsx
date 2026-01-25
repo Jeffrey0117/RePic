@@ -47,7 +47,8 @@ function App() {
     renameAlbum,
     deleteAlbum,
     addImage: addAlbumImage,
-    removeImage: removeAlbumImage
+    removeImage: removeAlbumImage,
+    updateImageCrop
   } = useWebAlbums();
 
   // Album image navigation state
@@ -176,8 +177,21 @@ function App() {
     }
   };
 
-  const handleCropComplete = (croppedImg) => {
-    setLocalImage(croppedImg);
+  const handleCropComplete = (result) => {
+    // Check if this is a virtual image crop (returns crop params instead of image)
+    if (result && typeof result === 'object' && result.type === 'crop-params') {
+      // Virtual image crop - save crop parameters to album
+      if (viewMode === 'album' && selectedAlbumId && albumImages[safeAlbumIndex]) {
+        const imageId = albumImages[safeAlbumIndex].id;
+        updateImageCrop(selectedAlbumId, imageId, result.crop);
+        setToast({ visible: true, message: t('cropSaved') });
+      }
+      setIsEditing(false);
+      return;
+    }
+
+    // Normal crop - replace local image with cropped version
+    setLocalImage(result);
     setIsEditing(false);
     setIsModified(true); // Mark as modified after crop
     // Toast will show after save, not after crop
@@ -847,9 +861,9 @@ function App() {
             )}
           </AnimatePresence>
 
-          {/* Image Cropper - inside main area (local mode only) */}
+          {/* Image Cropper - inside main area */}
           <AnimatePresence>
-            {viewMode === 'local' && localImage && isEditing && (
+            {isEditing && (localImage || currentAlbumImage) && (
               <motion.div
                 key="editor"
                 initial={{ opacity: 0 }}
@@ -859,11 +873,12 @@ function App() {
               >
                 <Suspense fallback={<div className="flex items-center justify-center h-full"><div className="text-white/60 animate-pulse">Loading editor...</div></div>}>
                   <ImageCropper
-                    imageSrc={localImage}
+                    imageSrc={viewMode === 'album' ? currentAlbumImage : localImage}
                     onCancel={() => setIsEditing(false)}
                     onComplete={handleCropComplete}
-                    fileCount={files.length}
-                    onApplyToAll={handleApplyToAll}
+                    fileCount={viewMode === 'album' ? albumImages.length : files.length}
+                    onApplyToAll={viewMode === 'local' ? handleApplyToAll : undefined}
+                    isVirtual={viewMode === 'album'}
                   />
                 </Suspense>
               </motion.div>
