@@ -514,12 +514,13 @@ export const Sidebar = ({
                                         <span className="text-[8px] mt-0.5">暫不支援</span>
                                     </div>
                                 ) : isWeb && originalUrl.startsWith('http') ? (
-                                    // Web images: use LazyImage with optimized loader
+                                    // Web images: use LazyImage with thumbnail for fast loading
                                     <LazyImage
                                         src={originalUrl}
                                         className="w-full h-full"
                                         style={clipPath ? { clipPath } : undefined}
                                         isHighPriority={Math.abs(index - currentIndex) <= 2}
+                                        useThumbnail={true}
                                         onError={() => setFailedImages(prev => new Set([...prev, fileUrl]))}
                                         fallbackElement={
                                             <div className="w-full h-full flex flex-col items-center justify-center bg-black/30 text-white/40">

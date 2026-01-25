@@ -1,11 +1,13 @@
 import { useState, useEffect, useRef, memo } from 'react';
-import { loadImage, getCached, PRIORITY_HIGH, PRIORITY_NORMAL, PRIORITY_LOW } from '../../utils/imageLoader';
+import { loadImage, loadThumbnail, getCached, getCachedThumbnail, PRIORITY_HIGH, PRIORITY_NORMAL, PRIORITY_LOW } from '../../utils/imageLoader';
 
 const electronAPI = window.electronAPI || null;
 
 /**
  * LazyImage - Only loads when visible in viewport
  * Uses imageLoader for optimized concurrent loading
+ *
+ * useThumbnail: Use 256x256 JPEG thumbnail for faster loading (sidebar)
  */
 export const LazyImage = memo(({
     src,
@@ -13,13 +15,21 @@ export const LazyImage = memo(({
     className = '',
     style,
     isHighPriority = false,
+    useThumbnail = false, // Use cached thumbnail instead of full image
     onLoad,
     onError,
     fallbackElement,
     showSpinner = true
 }) => {
     const imgRef = useRef(null);
-    const [loadedSrc, setLoadedSrc] = useState(() => getCached(src)); // Use cache immediately if available
+
+    // Initialize from cache immediately
+    const [loadedSrc, setLoadedSrc] = useState(() => {
+        if (useThumbnail) {
+            return getCachedThumbnail(src) || getCached(src);
+        }
+        return getCached(src);
+    });
     const [isLoading, setIsLoading] = useState(!loadedSrc);
     const [hasError, setHasError] = useState(false);
     const [isVisible, setIsVisible] = useState(false);
@@ -73,11 +83,18 @@ export const LazyImage = memo(({
 
         const priority = isHighPriority ? PRIORITY_HIGH : PRIORITY_NORMAL;
 
-        loadImage(src, priority)
+        // Use thumbnail loader for sidebar (faster, smaller)
+        const loader = useThumbnail ? loadThumbnail(src) : loadImage(src, priority);
+
+        loader
             .then((data) => {
-                setLoadedSrc(data);
-                setIsLoading(false);
-                onLoad?.();
+                if (data) {
+                    setLoadedSrc(data);
+                    setIsLoading(false);
+                    onLoad?.();
+                } else {
+                    throw new Error('No data');
+                }
             })
             .catch(async (err) => {
                 console.log('[LazyImage] Load failed, trying proxy:', src);
@@ -99,11 +116,15 @@ export const LazyImage = memo(({
                 setIsLoading(false);
                 onError?.(err);
             });
-    }, [isVisible, src, loadedSrc, isHighPriority, onLoad, onError]);
+    }, [isVisible, src, loadedSrc, isHighPriority, useThumbnail, onLoad, onError]);
 
-    // Reset when src changes - batch updates to reduce renders
+    // Reset when src changes - check cache first
     useEffect(() => {
-        const cached = getCached(src);
+        // Check thumbnail cache first if using thumbnails
+        const cached = useThumbnail
+            ? (getCachedThumbnail(src) || getCached(src))
+            : getCached(src);
+
         if (cached) {
             // Single batch update
             setLoadedSrc(cached);
@@ -120,7 +141,7 @@ export const LazyImage = memo(({
             setIsLoading(false);
             setHasError(false);
         }
-    }, [src]);
+    }, [src, useThumbnail]);
 
     if (hasError) {
         return fallbackElement || (

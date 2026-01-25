@@ -4,6 +4,7 @@
  * - Priority queue (visible images first)
  * - Memory cache (instant subsequent loads)
  * - IndexedDB persistence (offline support)
+ * - Thumbnail generation (fast sidebar loading)
  */
 
 import { getCachedImage, cacheImage } from './offlineCache';
@@ -14,11 +15,56 @@ const PRIORITY_HIGH = 0;
 const PRIORITY_NORMAL = 1;
 const PRIORITY_LOW = 2;
 
+// Thumbnail config
+const THUMB_SIZE = 256; // Max dimension
+const THUMB_QUALITY = 0.7; // JPEG quality (0.7 = ~10KB per thumb)
+const THUMB_PREFIX = 'thumb:';
+
 // State
 const memoryCache = new Map(); // URL -> base64/blob URL
+const thumbCache = new Map(); // URL -> thumbnail base64
 const loadingPromises = new Map(); // URL -> Promise (dedup concurrent requests)
 const queue = []; // Priority queue: { url, priority, resolve, reject }
 let activeCount = 0;
+
+/**
+ * Generate thumbnail from base64 image data
+ * Returns JPEG base64, ~5-15KB per image
+ */
+const generateThumbnail = (base64) => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      // Calculate size maintaining aspect ratio
+      let w = img.width;
+      let h = img.height;
+      if (w > h) {
+        if (w > THUMB_SIZE) {
+          h = Math.round(h * THUMB_SIZE / w);
+          w = THUMB_SIZE;
+        }
+      } else {
+        if (h > THUMB_SIZE) {
+          w = Math.round(w * THUMB_SIZE / h);
+          h = THUMB_SIZE;
+        }
+      }
+
+      // Draw to canvas
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+
+      // Export as JPEG (smaller than PNG)
+      const thumbData = canvas.toDataURL('image/jpeg', THUMB_QUALITY);
+      resolve(thumbData);
+    };
+    img.onerror = () => resolve(null);
+    img.src = base64;
+  });
+};
 
 /**
  * Process the next item in the queue
@@ -44,7 +90,7 @@ const processQueue = () => {
 };
 
 /**
- * Fetch a single image with caching
+ * Fetch a single image with caching + thumbnail generation
  */
 const fetchImage = async (url) => {
   // Check memory cache first (instant)
@@ -57,6 +103,19 @@ const fetchImage = async (url) => {
     const cached = await getCachedImage(url);
     if (cached) {
       memoryCache.set(url, cached);
+      // Also try to load cached thumbnail
+      const cachedThumb = await getCachedImage(THUMB_PREFIX + url);
+      if (cachedThumb) {
+        thumbCache.set(url, cachedThumb);
+      } else {
+        // Generate thumbnail from cached full image
+        generateThumbnail(cached).then(thumb => {
+          if (thumb) {
+            thumbCache.set(url, thumb);
+            cacheImage(THUMB_PREFIX + url, thumb).catch(() => {});
+          }
+        });
+      }
       return cached;
     }
   } catch (e) {
@@ -87,6 +146,14 @@ const fetchImage = async (url) => {
   // Store in caches
   memoryCache.set(url, base64);
   cacheImage(url, base64).catch(() => {}); // Async, don't wait
+
+  // Generate and cache thumbnail (async, don't block)
+  generateThumbnail(base64).then(thumb => {
+    if (thumb) {
+      thumbCache.set(url, thumb);
+      cacheImage(THUMB_PREFIX + url, thumb).catch(() => {});
+    }
+  });
 
   return base64;
 };
@@ -126,6 +193,70 @@ export const loadImage = (url, priority = PRIORITY_NORMAL) => {
   });
 
   return promise;
+};
+
+/**
+ * Load thumbnail only (much faster for sidebar)
+ * Returns cached thumbnail immediately if available
+ * Otherwise loads full image and generates thumbnail
+ */
+export const loadThumbnail = async (url) => {
+  if (!url || !url.startsWith('http')) {
+    return null;
+  }
+
+  // Check memory cache first
+  if (thumbCache.has(url)) {
+    return thumbCache.get(url);
+  }
+
+  // Check IndexedDB for cached thumbnail
+  try {
+    const cached = await getCachedImage(THUMB_PREFIX + url);
+    if (cached) {
+      thumbCache.set(url, cached);
+      return cached;
+    }
+  } catch (e) {
+    // Ignore
+  }
+
+  // No thumbnail cached, need to load full image first
+  // This will also generate thumbnail
+  await loadImage(url, PRIORITY_NORMAL);
+
+  // Return thumbnail (should be available now)
+  return thumbCache.get(url) || null;
+};
+
+/**
+ * Get cached thumbnail synchronously (or null)
+ */
+export const getCachedThumbnail = (url) => {
+  return thumbCache.get(url) || null;
+};
+
+/**
+ * Preload thumbnails for URLs (for sidebar)
+ */
+export const preloadThumbnails = async (urls) => {
+  for (const url of urls) {
+    if (!url || thumbCache.has(url)) continue;
+
+    // Check IndexedDB first
+    try {
+      const cached = await getCachedImage(THUMB_PREFIX + url);
+      if (cached) {
+        thumbCache.set(url, cached);
+        continue;
+      }
+    } catch (e) {
+      // Ignore
+    }
+
+    // Queue for loading (low priority)
+    loadImage(url, PRIORITY_LOW).catch(() => {});
+  }
 };
 
 /**
@@ -171,6 +302,7 @@ export const cancelPending = (urls) => {
  */
 export const clearMemoryCache = () => {
   memoryCache.clear();
+  thumbCache.clear();
 };
 
 /**
@@ -178,6 +310,7 @@ export const clearMemoryCache = () => {
  */
 export const getStats = () => ({
   memoryCacheSize: memoryCache.size,
+  thumbCacheSize: thumbCache.size,
   queueLength: queue.length,
   activeCount,
   maxConcurrent: MAX_CONCURRENT
