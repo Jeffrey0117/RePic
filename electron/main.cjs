@@ -126,8 +126,12 @@ function downloadToTemp(url) {
                     const imageUrl = extractOgImage(html);
                     if (imageUrl) {
                         console.log('[downloadToTemp] Found og:image:', imageUrl);
-                        // Recursively download the actual image
-                        downloadToTemp(imageUrl).then(resolve).catch(reject);
+                        // Recursively download the actual image, then cache with original URL
+                        downloadToTemp(imageUrl).then((filePath) => {
+                            // Cache original URL to the same file
+                            downloadCache.set(url, filePath);
+                            resolve(filePath);
+                        }).catch(reject);
                     } else {
                         reject(new Error('No image found in HTML'));
                     }
