@@ -71,6 +71,9 @@ function App() {
   const [uploadHistory, setUploadHistory] = useState([]);
   const [showUploadHistory, setShowUploadHistory] = useState(false);
 
+  // Copy to clipboard state
+  const [isCopying, setIsCopying] = useState(false);
+
   // View mode: 'local' for file system view, 'album' for web album view
   const [viewMode, setViewMode] = useState('local');
 
@@ -456,6 +459,92 @@ function App() {
     setAlbumImageIndex(0);
   }, [selectedAlbumId]);
 
+  // Copy image to clipboard
+  const handleCopy = async () => {
+    // Determine current image source
+    let imageSrc = null;
+    if (viewMode === 'album' && currentAlbumImage) {
+      imageSrc = currentAlbumImage;
+    } else if (viewMode === 'virtual' && virtualImageData?.url) {
+      imageSrc = virtualImageData.url;
+    } else if (localImage) {
+      imageSrc = localImage;
+    }
+
+    if (!imageSrc) {
+      setToast({ visible: true, message: t('noImageToCopy') });
+      return;
+    }
+
+    setIsCopying(true);
+
+    try {
+      let blob;
+
+      if (imageSrc.startsWith('data:')) {
+        // Base64 data URL
+        const response = await fetch(imageSrc);
+        blob = await response.blob();
+      } else if (imageSrc.startsWith('file://')) {
+        // Local file - read via electronAPI
+        const electronAPI = getElectronAPI();
+        if (electronAPI) {
+          const cleanPath = imageSrc.replace('file://', '').split('?')[0];
+          const dataUrl = electronAPI.readFile(cleanPath);
+          if (dataUrl) {
+            const response = await fetch(dataUrl);
+            blob = await response.blob();
+          }
+        }
+      } else if (imageSrc.startsWith('http')) {
+        // Web image - fetch directly
+        const response = await fetch(imageSrc);
+        blob = await response.blob();
+      }
+
+      if (!blob) {
+        throw new Error('Failed to load image');
+      }
+
+      // Convert to PNG for clipboard compatibility
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = URL.createObjectURL(blob);
+      });
+
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      ctx.drawImage(img, 0, 0);
+
+      URL.revokeObjectURL(img.src);
+
+      // Copy to clipboard
+      canvas.toBlob(async (pngBlob) => {
+        try {
+          await navigator.clipboard.write([
+            new ClipboardItem({ 'image/png': pngBlob })
+          ]);
+          setToast({ visible: true, message: t('copySuccess') });
+        } catch (clipboardError) {
+          console.error('[handleCopy] Clipboard error:', clipboardError);
+          setToast({ visible: true, message: t('copyFailed') });
+        }
+      }, 'image/png');
+
+    } catch (error) {
+      console.error('[handleCopy] Error:', error);
+      setToast({ visible: true, message: t('copyFailed', { error: error.message }) });
+    } finally {
+      setIsCopying(false);
+    }
+  };
+
   const handleUpload = async () => {
     if (!localImage) {
       setToast({ visible: true, message: t('noImageToUpload') });
@@ -590,6 +679,8 @@ function App() {
         onToggleEdit={() => setIsEditing(!isEditing)}
         onClear={handleClear}
         onSave={handleSave}
+        onCopy={handleCopy}
+        isCopying={isCopying}
         onUpload={handleUpload}
         isUploading={isUploading}
         uploadHistoryCount={uploadHistory.length}
@@ -603,6 +694,7 @@ function App() {
         albumSidebarCollapsed={albumSidebarCollapsed}
         onToggleAlbumSidebar={() => setAlbumSidebarCollapsed(!albumSidebarCollapsed)}
         onExportVirtual={() => setShowExportDialog(true)}
+        hasImage={!!(localImage || currentAlbumImage || virtualImageData?.url)}
       />
 
       {/* 2. Main Content Area */}

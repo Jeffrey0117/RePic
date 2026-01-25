@@ -104,5 +104,9 @@
   "exportFailed": "Export failed: {error}",
   "virtualImage": "Virtual Image",
   "loadingImage": "Loading image...",
-  "networkRequired": "Network connection required"
+  "networkRequired": "Network connection required",
+  "copyToClipboard": "Copy to Clipboard",
+  "noImageToCopy": "No image to copy",
+  "copySuccess": "Copied to clipboard!",
+  "copyFailed": "Copy failed"
 }

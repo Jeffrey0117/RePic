@@ -104,5 +104,9 @@
   "exportFailed": "匯出失敗：{error}",
   "virtualImage": "虛擬圖片",
   "loadingImage": "載入圖片中...",
-  "networkRequired": "需要網路連線"
+  "networkRequired": "需要網路連線",
+  "copyToClipboard": "複製到剪貼簿",
+  "noImageToCopy": "沒有圖片可複製",
+  "copySuccess": "已複製到剪貼簿！",
+  "copyFailed": "複製失敗"
 }
