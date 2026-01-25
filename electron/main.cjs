@@ -4,6 +4,7 @@ const fs = require('fs');
 const os = require('os');
 const https = require('https');
 const http = require('http');
+const crypto = require('crypto');
 
 // Temp directory for drag & drop
 const TEMP_DIR = path.join(os.tmpdir(), 'repic-temp');
@@ -39,28 +40,84 @@ function cleanupTempFiles() {
 }
 
 // Extract image URL from HTML (for social media URLs that return HTML)
-function extractImageFromHtml(html) {
+// Check if URL looks like a direct image URL
+function looksLikeImageUrl(url) {
+    const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'];
+    const urlPath = url.split('?')[0].toLowerCase();
+    return imageExtensions.some(ext => urlPath.endsWith(ext));
+}
+
+// Extract image URL from HTML page
+// If originalUrl looks like an image URL, we prioritize finding the raw/direct link
+// If originalUrl is a webpage URL, we use og:image
+function extractImageFromHtml(html, originalUrl = '') {
+    console.log('[extractImageFromHtml] HTML length:', html.length, 'originalUrl:', originalUrl.substring(0, 60));
+
+    const isImageUrl = looksLikeImageUrl(originalUrl);
+    console.log('[extractImageFromHtml] Original URL looks like image:', isImageUrl);
+
+    // If the original URL looks like an image, find the raw/direct image link
+    if (isImageUrl) {
+        // Method 1: Find "raw" or "download" links with same filename
+        const filename = originalUrl.split('/').pop()?.split('?')[0];
+        console.log('[extractImageFromHtml] Looking for raw link to:', filename);
+
+        // Look for raw.githubusercontent.com or similar raw links
+        const rawLinkMatch = html.match(/href=["'](https?:\/\/[^"']*raw[^"']*\/[^"']*\.(jpg|jpeg|png|gif|webp|bmp|svg)[^"']*)["']/i)
+            || html.match(/href=["'](https?:\/\/raw\.[^"']+)["']/i);
+        if (rawLinkMatch) {
+            console.log('[extractImageFromHtml] Found raw link:', rawLinkMatch[1]);
+            return rawLinkMatch[1];
+        }
+
+        // Method 2: Find img tag with the actual image (largest or matching filename)
+        const allImgMatches = html.match(/<img[^>]+src=["']([^"']+)["']/gi) || [];
+        const imgUrls = allImgMatches.map(tag => {
+            const srcMatch = tag.match(/src=["']([^"']+)["']/i);
+            return srcMatch ? srcMatch[1] : null;
+        }).filter(url => url && (url.startsWith('http') || url.startsWith('//')));
+
+        console.log('[extractImageFromHtml] Found', imgUrls.length, 'img URLs');
+
+        // Prefer URL containing the same filename or raw/cdn URLs
+        const bestImg = imgUrls.find(url => filename && url.includes(filename))
+            || imgUrls.find(url => url.includes('raw.') || url.includes('cdn.') || url.includes('githubusercontent'))
+            || imgUrls.find(url => looksLikeImageUrl(url));
+
+        if (bestImg) {
+            // Handle protocol-relative URLs
+            const fullUrl = bestImg.startsWith('//') ? 'https:' + bestImg : bestImg;
+            console.log('[extractImageFromHtml] Found img src:', fullUrl);
+            return fullUrl;
+        }
+
+        console.log('[extractImageFromHtml] No raw/direct image found for image URL');
+        // Don't fall back to og:image for image URLs - it's usually wrong (like repo avatar)
+        return null;
+    }
+
+    // For non-image URLs (social media posts, articles), use og:image approach
     // First try: Find img tags with instagram/threads CDN URLs (most accurate for posts)
     const imgMatches = html.match(/<img[^>]+src=["']([^"']*(?:instagram|fbcdn|cdninstagram)[^"']*)["']/gi);
+    console.log('[extractImageFromHtml] Found', imgMatches?.length || 0, 'social media img matches');
+
     if (imgMatches && imgMatches.length > 0) {
-        // Extract URLs and find the largest resolution one
         const urls = imgMatches.map(tag => {
             const srcMatch = tag.match(/src=["']([^"']+)["']/i);
             return srcMatch ? srcMatch[1] : null;
         }).filter(Boolean);
 
-        // Prefer URLs with larger dimensions (often have size in URL)
         const bestUrl = urls.find(url => url.includes('1080') || url.includes('1440'))
             || urls.find(url => url.includes('640') || url.includes('750'))
             || urls[0];
 
         if (bestUrl) {
-            console.log('[extractImageFromHtml] Found img src:', bestUrl);
+            console.log('[extractImageFromHtml] Selected social media img:', bestUrl);
             return bestUrl;
         }
     }
 
-    // Fallback: Try og:image
+    // Fallback: Try og:image (for social media/article pages)
     const ogMatch = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
         || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
     if (ogMatch) {
@@ -76,35 +133,67 @@ function extractImageFromHtml(html) {
         return twitterMatch[1];
     }
 
+    console.log('[extractImageFromHtml] No image URL found in HTML');
     return null;
 }
 
+// Convert special URLs to direct image URLs
+function normalizeImageUrl(url) {
+    // GitHub blob URL -> add ?raw=true to get direct image
+    // https://github.com/user/repo/blob/branch/path/image.png
+    // -> https://github.com/user/repo/blob/branch/path/image.png?raw=true
+    if (url.match(/^https?:\/\/github\.com\/[^/]+\/[^/]+\/blob\/.+\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i)) {
+        const rawUrl = url + '?raw=true';
+        console.log('[normalizeImageUrl] GitHub blob -> raw:', rawUrl);
+        return rawUrl;
+    }
+
+    // GitHub user content (already raw, no change needed)
+    // raw.githubusercontent.com URLs are already direct
+
+    return url;
+}
+
 // Download image from URL to temp file (with cache)
+let requestCounter = 0;
 function downloadToTemp(url) {
+    // Normalize URL first (e.g., GitHub blob -> raw)
+    const normalizedUrl = normalizeImageUrl(url);
+    if (normalizedUrl !== url) {
+        console.log('[downloadToTemp] URL normalized, using:', normalizedUrl);
+        return downloadToTemp(normalizedUrl);
+    }
+
+    const reqId = ++requestCounter;
+    console.log(`[downloadToTemp #${reqId}] START url:`, url.substring(0, 80) + '...');
+
     return new Promise((resolve, reject) => {
         // Check cache first
         const cached = downloadCache.get(url);
         if (cached && fs.existsSync(cached)) {
-            console.log('[downloadToTemp] Using cached:', cached);
+            console.log(`[downloadToTemp #${reqId}] CACHE HIT:`, cached);
             resolve(cached);
             return;
         }
 
         ensureTempDir();
 
-        // Generate temp filename using URL hash for consistency
-        const urlHash = Buffer.from(url).toString('base64').replace(/[/+=]/g, '_').slice(0, 32);
+        // Generate temp filename using proper hash for uniqueness
+        const urlHash = crypto.createHash('md5').update(url).digest('hex').slice(0, 16);
         const urlObj = new URL(url);
         const ext = path.extname(urlObj.pathname) || '.png';
         const filename = `drag-${urlHash}${ext}`;
         const tempPath = path.join(TEMP_DIR, filename);
+        console.log(`[downloadToTemp #${reqId}] Hash: ${urlHash}, File: ${filename}`);
 
         // Check if file already exists (from previous session)
         if (fs.existsSync(tempPath)) {
+            console.log(`[downloadToTemp #${reqId}] FILE EXISTS on disk:`, tempPath);
             downloadCache.set(url, tempPath);
             resolve(tempPath);
             return;
         }
+        console.log(`[downloadToTemp #${reqId}] Downloading fresh...`);
 
         const protocol = url.startsWith('https') ? https : http;
 
@@ -145,20 +234,23 @@ function downloadToTemp(url) {
 
             // If response is HTML, try to extract image URL
             if (contentType.includes('text/html')) {
-                console.log('[downloadToTemp] Got HTML, extracting image URL...');
+                console.log(`[downloadToTemp #${reqId}] Got HTML, extracting image URL...`);
                 let html = '';
                 response.on('data', chunk => html += chunk);
                 response.on('end', () => {
-                    const imageUrl = extractImageFromHtml(html);
+                    console.log(`[downloadToTemp #${reqId}] HTML received, length:`, html.length);
+                    const imageUrl = extractImageFromHtml(html, url);
                     if (imageUrl) {
-                        console.log('[downloadToTemp] Found og:image:', imageUrl);
+                        console.log(`[downloadToTemp #${reqId}] Found image URL:`, imageUrl.substring(0, 80) + '...');
                         // Recursively download the actual image, then cache with original URL
                         downloadToTemp(imageUrl).then((filePath) => {
                             // Cache original URL to the same file
+                            console.log(`[downloadToTemp #${reqId}] Caching original URL to:`, filePath);
                             downloadCache.set(url, filePath);
                             resolve(filePath);
                         }).catch(reject);
                     } else {
+                        console.log(`[downloadToTemp #${reqId}] NO IMAGE FOUND in HTML!`);
                         reject(new Error('No image found in HTML'));
                     }
                 });

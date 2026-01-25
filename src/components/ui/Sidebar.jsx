@@ -14,11 +14,27 @@ const isRepicFile = (path) => path?.toLowerCase().endsWith('.repic');
 // Cache for proxied images (URL -> base64)
 const proxyCache = new Map();
 
-export const Sidebar = ({ files, currentIndex, onSelect, cacheVersion = 0, mode = 'local' }) => {
+export const Sidebar = ({
+    files,
+    currentIndex,
+    onSelect,
+    cacheVersion = 0,
+    mode = 'local',
+    isMultiSelectMode = false,
+    selectedIds = new Set(),
+    onToggleSelect,
+    onEnterMultiSelect,
+    onExitMultiSelect,
+    onDeleteSelected
+}) => {
     // Cache for .repic file data (url + crop)
     const [repicData, setRepicData] = useState({});
     // Cache for proxied images (when direct load fails)
     const [proxiedUrls, setProxiedUrls] = useState({});
+    // Track failed images (after proxy also failed)
+    const [failedImages, setFailedImages] = useState(new Set());
+    // Track loading images (to show placeholder instead of broken image)
+    const [loadingImages, setLoadingImages] = useState(new Set());
     const [width, setWidth] = useState(() => {
         const saved = localStorage.getItem(SIDEBAR_WIDTH_KEY);
         if (saved) {
@@ -88,6 +104,39 @@ export const Sidebar = ({ files, currentIndex, onSelect, cacheVersion = 0, mode 
             className="h-full bg-surface/30 backdrop-blur-xl border-r border-white/5 flex flex-col overflow-hidden relative"
             style={{ width: `${width}px` }}
         >
+            {/* Multi-select toolbar for album mode */}
+            {mode === 'web' && (
+                <div className="flex-shrink-0 px-2 py-2 border-b border-white/5">
+                    {isMultiSelectMode ? (
+                        <div className="flex items-center justify-between gap-1">
+                            <button
+                                onClick={onExitMultiSelect}
+                                className="text-[10px] text-white/60 hover:text-white px-2 py-1 rounded hover:bg-white/10"
+                            >
+                                ✕
+                            </button>
+                            <span className="text-[10px] text-white/60">
+                                {selectedIds.size} 選中
+                            </span>
+                            <button
+                                onClick={onDeleteSelected}
+                                disabled={selectedIds.size === 0}
+                                className="text-[10px] text-red-400 hover:text-red-300 px-2 py-1 rounded hover:bg-red-500/20 disabled:opacity-30 disabled:cursor-not-allowed"
+                            >
+                                刪除
+                            </button>
+                        </div>
+                    ) : (
+                        <button
+                            onClick={onEnterMultiSelect}
+                            className="w-full text-[10px] text-white/50 hover:text-white/80 py-1 rounded hover:bg-white/5 transition-colors"
+                        >
+                            多選
+                        </button>
+                    )}
+                </div>
+            )}
+
             <div className="flex-1 overflow-y-auto no-scrollbar py-4 px-2 space-y-3">
                 {files.map((file, index) => {
                     const isActive = index === currentIndex;
@@ -111,6 +160,9 @@ export const Sidebar = ({ files, currentIndex, onSelect, cacheVersion = 0, mode 
                     // Use proxied URL if available (for hotlink protected images)
                     const imgSrc = (isWeb && proxiedUrls[fileUrl]) ? proxiedUrls[fileUrl] : originalUrl;
 
+                    // Check if image failed to load
+                    const isFailed = isWeb && failedImages.has(fileUrl);
+
                     // Get crop data: from .repic file or from web album image object
                     const crop = isRepic
                         ? repicInfo?.crop
@@ -121,14 +173,22 @@ export const Sidebar = ({ files, currentIndex, onSelect, cacheVersion = 0, mode 
                         ? `inset(${crop.y}% ${100 - crop.x - crop.width}% ${100 - crop.y - crop.height}% ${crop.x}%)`
                         : undefined;
 
+                    // Get image id for multi-select
+                    const imageId = isWeb && typeof file === 'object' ? file.id : null;
+                    const isSelected = imageId && selectedIds.has(imageId);
+
                     return (
                         <motion.div
                             key={isWeb ? (typeof file === 'string' ? file : file.id) : `${file}-${cacheVersion}`}
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
+                            whileHover={{ scale: isMultiSelectMode ? 1 : 1.05 }}
+                            whileTap={{ scale: isMultiSelectMode ? 1 : 0.95 }}
                             onClick={() => {
-                                console.log('[Sidebar] Clicked index:', index, 'file:', file, 'fileName:', fileName);
-                                onSelect(index);
+                                if (isMultiSelectMode && imageId) {
+                                    onToggleSelect(imageId);
+                                } else {
+                                    console.log('[Sidebar] Clicked index:', index, 'file:', file, 'fileName:', fileName);
+                                    onSelect(index);
+                                }
                             }}
                             className={`relative cursor-pointer group flex flex-col items-center`}
                         >
@@ -138,11 +198,11 @@ export const Sidebar = ({ files, currentIndex, onSelect, cacheVersion = 0, mode 
 
                             <div
                                 className={`
-                                    rounded-lg overflow-hidden border-2 transition-all duration-200 shadow-lg bg-black/50
-                                    ${isActive ? 'border-primary ring-2 ring-primary/20 scale-105' : 'border-transparent group-hover:border-white/30'}
+                                    rounded-lg overflow-hidden border-2 transition-all duration-200 shadow-lg bg-black/50 relative
+                                    ${isSelected ? 'border-green-500 ring-2 ring-green-500/30' : isActive ? 'border-primary ring-2 ring-primary/20 scale-105' : 'border-transparent group-hover:border-white/30'}
                                 `}
                                 style={{ width: `${width - 24}px`, height: `${width - 24}px` }}
-                                draggable
+                                draggable={!isMultiSelectMode}
                                 onDragStart={(e) => {
                                     e.preventDefault();
                                     // Use Electron's native drag for system-level drag
@@ -151,29 +211,76 @@ export const Sidebar = ({ files, currentIndex, onSelect, cacheVersion = 0, mode 
                                     }
                                 }}
                             >
-                                {imgSrc ? (
-                                    <img
-                                        src={imgSrc}
-                                        alt=""
-                                        className="w-full h-full object-contain pointer-events-none"
-                                        style={clipPath ? { clipPath } : undefined}
-                                        loading="lazy"
-                                        draggable={false}
-                                        referrerPolicy="no-referrer"
-                                        onError={async (e) => {
-                                            // If image fails to load and we haven't tried proxy yet
-                                            if (isWeb && originalUrl.startsWith('http') && !proxiedUrls[fileUrl] && electronAPI?.proxyImage) {
-                                                console.log('[Sidebar] Image failed, trying proxy:', originalUrl);
-                                                const result = await electronAPI.proxyImage(originalUrl);
-                                                if (result.success) {
-                                                    setProxiedUrls(prev => ({ ...prev, [fileUrl]: result.data }));
+                                {isFailed ? (
+                                    <div className="w-full h-full flex flex-col items-center justify-center bg-black/30 text-white/40">
+                                        <span className="text-sm">✕</span>
+                                        <span className="text-[8px] mt-0.5">暫不支援</span>
+                                    </div>
+                                ) : imgSrc ? (
+                                    <>
+                                        {/* Loading placeholder - shows while image loads */}
+                                        {isWeb && loadingImages.has(fileUrl) && (
+                                            <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                                                <div className="w-4 h-4 border-2 border-white/30 border-t-white/80 rounded-full animate-spin" />
+                                            </div>
+                                        )}
+                                        <img
+                                            src={imgSrc}
+                                            alt=""
+                                            className={`w-full h-full object-contain pointer-events-none transition-opacity ${isWeb && loadingImages.has(fileUrl) ? 'opacity-0' : 'opacity-100'}`}
+                                            style={clipPath ? { clipPath } : undefined}
+                                            loading="lazy"
+                                            draggable={false}
+                                            referrerPolicy="no-referrer"
+                                            onLoadStart={() => {
+                                                if (isWeb && !proxiedUrls[fileUrl]) {
+                                                    setLoadingImages(prev => new Set([...prev, fileUrl]));
                                                 }
-                                            }
-                                        }}
-                                    />
+                                            }}
+                                            onLoad={() => {
+                                                setLoadingImages(prev => {
+                                                    const newSet = new Set(prev);
+                                                    newSet.delete(fileUrl);
+                                                    return newSet;
+                                                });
+                                            }}
+                                            onError={async (e) => {
+                                                // Remove from loading
+                                                setLoadingImages(prev => {
+                                                    const newSet = new Set(prev);
+                                                    newSet.delete(fileUrl);
+                                                    return newSet;
+                                                });
+                                                // If image fails to load and we haven't tried proxy yet
+                                                if (isWeb && originalUrl.startsWith('http') && !proxiedUrls[fileUrl] && electronAPI?.proxyImage) {
+                                                    setLoadingImages(prev => new Set([...prev, fileUrl]));
+                                                    console.log('[Sidebar] Image failed, trying proxy:', originalUrl);
+                                                    const result = await electronAPI.proxyImage(originalUrl);
+                                                    setLoadingImages(prev => {
+                                                        const newSet = new Set(prev);
+                                                        newSet.delete(fileUrl);
+                                                        return newSet;
+                                                    });
+                                                    if (result.success) {
+                                                        setProxiedUrls(prev => ({ ...prev, [fileUrl]: result.data }));
+                                                    } else {
+                                                        setFailedImages(prev => new Set([...prev, fileUrl]));
+                                                    }
+                                                } else if (isWeb && proxiedUrls[fileUrl]) {
+                                                    setFailedImages(prev => new Set([...prev, fileUrl]));
+                                                }
+                                            }}
+                                        />
+                                    </>
                                 ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-white/20 text-xs">
-                                        Loading...
+                                    <div className="w-full h-full flex items-center justify-center bg-black/20">
+                                        <div className="w-4 h-4 border-2 border-white/30 border-t-white/80 rounded-full animate-spin" />
+                                    </div>
+                                )}
+                                {/* Selection checkbox indicator */}
+                                {isMultiSelectMode && imageId && (
+                                    <div className={`absolute top-1 right-1 w-5 h-5 rounded-full flex items-center justify-center transition-all ${isSelected ? 'bg-green-500 text-white' : 'bg-black/50 border border-white/30 text-transparent'}`}>
+                                        ✓
                                     </div>
                                 )}
                             </div>

@@ -88,6 +88,10 @@ function App() {
   // Export dialog state
   const [showExportDialog, setShowExportDialog] = useState(false);
 
+  // Multi-select state for album mode
+  const [selectedImageIds, setSelectedImageIds] = useState(new Set());
+  const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
+
   // Sync file system image with local view only when currentImage or cacheVersion changes
   useEffect(() => {
     console.log('[App useEffect] Triggered - currentImage:', currentImage, 'currentIndex:', currentIndex, 'cacheVersion:', cacheVersion);
@@ -504,6 +508,42 @@ function App() {
     }
   };
 
+  // Toggle image selection for multi-select mode
+  const toggleImageSelection = useCallback((imageId) => {
+    setSelectedImageIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(imageId)) {
+        newSet.delete(imageId);
+      } else {
+        newSet.add(imageId);
+      }
+      return newSet;
+    });
+  }, []);
+
+  // Batch delete selected images
+  const handleBatchDelete = useCallback(() => {
+    if (selectedImageIds.size === 0 || !selectedAlbumId) return;
+
+    if (confirm(t('deleteSelectedConfirm', { count: selectedImageIds.size }))) {
+      // Delete all selected images
+      selectedImageIds.forEach(imageId => {
+        removeAlbumImage(selectedAlbumId, imageId);
+      });
+      // Clear selection and exit multi-select mode
+      setSelectedImageIds(new Set());
+      setIsMultiSelectMode(false);
+      // Reset index if needed
+      setAlbumImageIndex(0);
+    }
+  }, [selectedImageIds, selectedAlbumId, removeAlbumImage, t]);
+
+  // Exit multi-select mode
+  const exitMultiSelectMode = useCallback(() => {
+    setSelectedImageIds(new Set());
+    setIsMultiSelectMode(false);
+  }, []);
+
   const handleSave = async () => {
     // For album mode: download web image to local
     if (viewMode === 'album' && selectedAlbum && selectedAlbum.images[albumImageIndex]) {
@@ -825,6 +865,12 @@ function App() {
             const imageToDelete = albumImages[safeAlbumIndex];
             if (confirm(t('deleteImageConfirm'))) {
               removeAlbumImage(selectedAlbumId, imageToDelete.id);
+              // Also remove from multi-select if selected
+              setSelectedImageIds(prev => {
+                const newSet = new Set(prev);
+                newSet.delete(imageToDelete.id);
+                return newSet;
+              });
               // Navigate to previous image if deleting last, otherwise stay at current index
               if (safeAlbumIndex >= albumImages.length - 1 && safeAlbumIndex > 0) {
                 setAlbumImageIndex(prev => prev - 1);
@@ -874,6 +920,12 @@ function App() {
             cacheVersion={cacheVersion}
             onSelect={viewMode === 'album' ? setAlbumImageIndex : selectImage}
             mode={viewMode === 'album' ? 'web' : 'local'}
+            isMultiSelectMode={viewMode === 'album' && isMultiSelectMode}
+            selectedIds={selectedImageIds}
+            onToggleSelect={toggleImageSelection}
+            onEnterMultiSelect={() => setIsMultiSelectMode(true)}
+            onExitMultiSelect={exitMultiSelectMode}
+            onDeleteSelected={handleBatchDelete}
           />
         )}
 

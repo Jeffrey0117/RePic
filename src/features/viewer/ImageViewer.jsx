@@ -13,12 +13,16 @@ export const ImageViewer = ({ src, crop }) => {
     const [isDragging, setIsDragging] = useState(false);
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
     const [proxiedSrc, setProxiedSrc] = useState(null);
+    const [loadFailed, setLoadFailed] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
 
-    // Reset zoom, position, and proxied src when image changes
+    // Reset zoom, position, proxied src, and failed state when image changes
     useEffect(() => {
         setScale(1);
         setPosition({ x: 0, y: 0 });
         setProxiedSrc(null);
+        setLoadFailed(false);
+        setIsLoading(true);
     }, [src]);
 
     // Actual image source (use proxied if available)
@@ -156,35 +160,60 @@ export const ImageViewer = ({ src, crop }) => {
                 </div>
             )}
 
-            <img
-                ref={imageRef}
-                src={imageSrc}
-                alt="View"
-                className="block select-none rounded-md"
-                style={{
-                    maxWidth: '100%',
-                    maxHeight: '100%',
-                    objectFit: 'contain',
-                    transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
-                    transition: isDragging ? 'none' : 'transform 0.15s ease-out',
-                    // Apply crop using clip-path if crop params exist
-                    ...(crop && {
-                        clipPath: `inset(${crop.y}% ${100 - crop.x - crop.width}% ${100 - crop.y - crop.height}% ${crop.x}%)`
-                    })
-                }}
-                draggable={false}
-                referrerPolicy="no-referrer"
-                onError={async () => {
-                    // If image fails to load and we haven't tried proxy yet
-                    if (src.startsWith('http') && !proxiedSrc && electronAPI?.proxyImage) {
-                        console.log('[ImageViewer] Image failed, trying proxy:', src);
-                        const result = await electronAPI.proxyImage(src);
-                        if (result.success) {
-                            setProxiedSrc(result.data);
+            {/* Loading spinner */}
+            {isLoading && !loadFailed && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="w-8 h-8 border-3 border-white/20 border-t-white/80 rounded-full animate-spin" />
+                </div>
+            )}
+
+            {loadFailed ? (
+                <div className="flex flex-col items-center justify-center text-white/40 p-8">
+                    <span className="text-4xl mb-3">✕</span>
+                    <span className="text-base font-medium">暫不支援此來源</span>
+                </div>
+            ) : (
+                <img
+                    ref={imageRef}
+                    src={imageSrc}
+                    alt="View"
+                    className={`block select-none rounded-md transition-opacity duration-200 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+                    style={{
+                        maxWidth: '100%',
+                        maxHeight: '100%',
+                        objectFit: 'contain',
+                        transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
+                        transition: isDragging ? 'none' : 'transform 0.15s ease-out',
+                        // Apply crop using clip-path if crop params exist
+                        ...(crop && {
+                            clipPath: `inset(${crop.y}% ${100 - crop.x - crop.width}% ${100 - crop.y - crop.height}% ${crop.x}%)`
+                        })
+                    }}
+                    draggable={false}
+                    referrerPolicy="no-referrer"
+                    onLoad={() => setIsLoading(false)}
+                    onError={async () => {
+                        // If image fails to load and we haven't tried proxy yet
+                        if (src.startsWith('http') && !proxiedSrc && electronAPI?.proxyImage) {
+                            console.log('[ImageViewer] Image failed, trying proxy:', src);
+                            const result = await electronAPI.proxyImage(src);
+                            if (result.success) {
+                                setProxiedSrc(result.data);
+                            } else {
+                                setIsLoading(false);
+                                setLoadFailed(true);
+                            }
+                        } else if (proxiedSrc) {
+                            // Proxied image also failed
+                            setIsLoading(false);
+                            setLoadFailed(true);
+                        } else {
+                            setIsLoading(false);
+                            setLoadFailed(true);
                         }
-                    }
-                }}
-            />
+                    }}
+                />
+            )}
         </div>
     );
 };
