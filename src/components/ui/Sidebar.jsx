@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { motion } from '../../lib/motion';
 import { getThumbnail, saveThumbnail, generateThumbnail } from '../../utils/thumbnailCache';
 import { getCachedImage, cacheImage } from '../../utils/offlineCache';
 import { preloadImages, getCached } from '../../utils/imageLoader';
@@ -444,11 +443,9 @@ export const Sidebar = ({
                     const isDragOver = dragOverIndex === index;
 
                     return (
-                        <motion.div
+                        <div
                             key={isWeb ? (typeof file === 'string' ? file : file.id) : `${file}-${cacheVersion}`}
                             data-thumb="true"
-                            whileHover={{ scale: isMultiSelectMode || isDragging ? 1 : 1.05 }}
-                            whileTap={{ scale: isMultiSelectMode ? 1 : 0.95 }}
                             onClick={() => {
                                 if (isMultiSelectMode && imageId) {
                                     onToggleSelect(imageId);
@@ -486,7 +483,7 @@ export const Sidebar = ({
                                 setDragIndex(null);
                                 setDragOverIndex(null);
                             }}
-                            className={`relative cursor-pointer group flex flex-col items-center ${isDragging ? 'opacity-50' : ''} ${isDragOver ? 'scale-110' : ''}`}
+                            className={`relative cursor-pointer group flex flex-col items-center transition-transform duration-100 ${isDragging ? 'opacity-50' : ''} ${isDragOver ? 'scale-110' : ''} ${!isMultiSelectMode && !isDragging ? 'hover:scale-105 active:scale-95' : ''}`}
                             style={{ contentVisibility: 'auto', containIntrinsicSize: `${thumbSize}px ${thumbSize + 40}px` }}
                         >
                             <div className="text-[10px] text-white/40 truncate w-full mb-1 text-center group-hover:text-white/80 transition-colors">
@@ -561,7 +558,7 @@ export const Sidebar = ({
                             <div className={`mt-1.5 text-[10px] truncate w-full px-1 text-center font-medium ${isActive ? 'text-primary' : 'text-white/70'}`}>
                                 {fileName}
                             </div>
-                        </motion.div>
+                        </div>
                     );
                 })}
             </div>
