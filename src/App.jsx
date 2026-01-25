@@ -295,9 +295,11 @@ function App() {
     // Add the image to the album if we found a valid URL
     if (imageUrl && imageUrl.startsWith('http')) {
       addAlbumImage(selectedAlbumId, imageUrl);
+      // Jump to the newly added image (it's at the end)
+      setAlbumImageIndex(albumImages.length);
       setToast({ visible: true, message: t('imageAdded') || 'Image added!' });
     }
-  }, [viewMode, selectedAlbumId, addAlbumImage, t]);
+  }, [viewMode, selectedAlbumId, addAlbumImage, albumImages.length, t]);
 
   const handleCropComplete = async (result) => {
     // Check if this is a virtual image crop (returns crop params instead of image)
@@ -1076,6 +1078,8 @@ function App() {
               if (result.status === 'success' && result.data) {
                 const imageUrl = result.data.url_direct || result.data.url_preview;
                 addAlbumImage(selectedAlbumId, imageUrl);
+                // Jump to newly added image
+                setAlbumImageIndex(albumImages.length);
                 setToast({ visible: true, message: t('imageAdded') });
               }
             } catch (err) {
@@ -1099,7 +1103,10 @@ function App() {
         const urls = text.split(/[\n,]/).map(u => u.trim()).filter(u => u.startsWith('http'));
         if (urls.length > 0 && viewMode === 'album' && selectedAlbumId) {
           e.preventDefault();
+          // Jump to first newly added image
+          const newIndex = albumImages.length;
           urls.forEach(url => addAlbumImage(selectedAlbumId, url));
+          setAlbumImageIndex(newIndex);
           setToast({ visible: true, message: t('imageAdded') });
         }
       }
@@ -1107,7 +1114,7 @@ function App() {
 
     window.addEventListener('paste', handlePaste);
     return () => window.removeEventListener('paste', handlePaste);
-  }, [isEditing, viewMode, selectedAlbumId, addAlbumImage, t]);
+  }, [isEditing, viewMode, selectedAlbumId, addAlbumImage, albumImages.length, t]);
 
   return (
     <div
@@ -1177,7 +1184,13 @@ function App() {
         viewMode={viewMode}
         onToggleViewMode={() => setViewMode(viewMode === 'local' ? 'album' : 'local')}
         selectedAlbum={selectedAlbum}
-        onAddAlbumImage={(url) => selectedAlbumId && addAlbumImage(selectedAlbumId, url)}
+        onAddAlbumImage={(url) => {
+          if (selectedAlbumId) {
+            addAlbumImage(selectedAlbumId, url);
+            // Jump to newly added image
+            setAlbumImageIndex(albumImages.length);
+          }
+        }}
         albumSidebarCollapsed={albumSidebarCollapsed}
         onToggleAlbumSidebar={() => setAlbumSidebarCollapsed(!albumSidebarCollapsed)}
         onExportVirtual={() => setShowExportDialog(true)}
@@ -1318,14 +1331,18 @@ function App() {
                                 const urls = text.split(/[\n,]/).map(u => u.trim()).filter(Boolean);
                                 if (urls.length > 0 && urls.every(url => url.startsWith('http'))) {
                                   e.preventDefault();
+                                  const newIndex = albumImages.length;
                                   urls.forEach(url => selectedAlbumId && addAlbumImage(selectedAlbumId, url));
+                                  setAlbumImageIndex(newIndex);
                                 }
                               }
                             }}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter' && e.target.value.trim()) {
                                 const urls = e.target.value.split(/[\n,]/).map(u => u.trim()).filter(Boolean);
+                                const newIndex = albumImages.length;
                                 urls.forEach(url => selectedAlbumId && addAlbumImage(selectedAlbumId, url));
+                                setAlbumImageIndex(newIndex);
                                 e.target.value = '';
                               }
                             }}
