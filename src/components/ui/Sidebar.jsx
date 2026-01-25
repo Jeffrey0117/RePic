@@ -166,24 +166,29 @@ export const Sidebar = ({
     // Calculate thumbnail size based on position
     const thumbSize = isHorizontal ? height - 60 : width - 24; // Leave room for labels
 
-    // Scroll to current item when it changes
+    // Scroll to current item when it changes or files change
     useEffect(() => {
         const container = scrollContainerRef.current;
-        if (!container || currentIndex < 0) return;
+        if (!container || currentIndex < 0 || files.length === 0) return;
 
-        const itemSize = thumbSize + 12; // thumbnail size + gap
-        const scrollPos = currentIndex * itemSize;
+        // Small delay to ensure DOM has updated with new items
+        const timeoutId = setTimeout(() => {
+            const itemSize = thumbSize + 12; // thumbnail size + gap
+            const scrollPos = currentIndex * itemSize;
 
-        if (isHorizontal) {
-            const containerWidth = container.clientWidth;
-            const targetScroll = scrollPos - containerWidth / 2 + itemSize / 2;
-            container.scrollTo({ left: Math.max(0, targetScroll), behavior: 'smooth' });
-        } else {
-            const containerHeight = container.clientHeight;
-            const targetScroll = scrollPos - containerHeight / 2 + itemSize / 2;
-            container.scrollTo({ top: Math.max(0, targetScroll), behavior: 'smooth' });
-        }
-    }, [currentIndex, thumbSize, isHorizontal]);
+            if (isHorizontal) {
+                const containerWidth = container.clientWidth;
+                const targetScroll = scrollPos - containerWidth / 2 + itemSize / 2;
+                container.scrollTo({ left: Math.max(0, targetScroll), behavior: 'smooth' });
+            } else {
+                const containerHeight = container.clientHeight;
+                const targetScroll = scrollPos - containerHeight / 2 + itemSize / 2;
+                container.scrollTo({ top: Math.max(0, targetScroll), behavior: 'smooth' });
+            }
+        }, 50);
+
+        return () => clearTimeout(timeoutId);
+    }, [currentIndex, thumbSize, isHorizontal, files.length]);
 
     const handleResizeMouseDown = useCallback((e) => {
         e.preventDefault();

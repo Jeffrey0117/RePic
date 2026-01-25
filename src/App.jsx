@@ -49,6 +49,7 @@ function App() {
     renameAlbum,
     deleteAlbum,
     addImage: addAlbumImage,
+    addImages: addAlbumImages,
     removeImage: removeAlbumImage,
     updateImageCrop,
     reorderImages,
@@ -252,7 +253,15 @@ function App() {
     }
   }, []);
 
-  const handleDrop = useCallback((e) => {
+  // Check if URL looks like a direct image URL
+  const looksLikeImageUrl = useCallback((url) => {
+    if (!url) return false;
+    const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'];
+    const urlPath = url.split('?')[0].toLowerCase();
+    return imageExtensions.some(ext => urlPath.endsWith(ext));
+  }, []);
+
+  const handleDrop = useCallback(async (e) => {
     e.preventDefault();
     e.stopPropagation();
     dragCounter.current = 0;
@@ -264,6 +273,7 @@ function App() {
     // Try to extract image URL from the drop event
     const dataTransfer = e.dataTransfer;
     let imageUrl = null;
+    let isFromHtmlImg = false;
 
     // Method 1: Check for text/uri-list (direct URL)
     const uriList = dataTransfer.getData('text/uri-list');
@@ -281,6 +291,7 @@ function App() {
         const match = html.match(/<img[^>]+src=["']([^"']+)["']/i);
         if (match) {
           imageUrl = match[1];
+          isFromHtmlImg = true;
         }
       }
     }
@@ -293,16 +304,42 @@ function App() {
       }
     }
 
-    // Add the image to the album if we found a valid URL
-    if (imageUrl && imageUrl.startsWith('http')) {
-      // Start loading immediately (generates thumbnail in background)
+    if (!imageUrl || !imageUrl.startsWith('http')) return;
+
+    // Check if it's a direct image URL or a webpage
+    const isDirectImage = isFromHtmlImg || looksLikeImageUrl(imageUrl);
+
+    if (isDirectImage) {
+      // Direct image - add immediately
       loadImage(imageUrl, PRIORITY_HIGH).catch(() => {});
       addAlbumImage(selectedAlbumId, imageUrl);
-      // Jump to the newly added image (it's at the end)
       setAlbumImageIndex(selectedAlbum?.images?.length || 0);
       setToast({ visible: true, message: t('imageAdded') || 'Image added!' });
+    } else {
+      // Webpage URL - try to scrape images
+      const electronAPI = getElectronAPI();
+      if (electronAPI?.scrapeImages) {
+        setToast({ visible: true, message: t('scraping') || '正在抓取圖片...' });
+        const result = await electronAPI.scrapeImages(imageUrl);
+        if (result.success && result.images?.length > 0) {
+          const newIndex = selectedAlbum?.images?.length || 0;
+          addAlbumImages(selectedAlbumId, result.images);
+          setAlbumImageIndex(newIndex);
+          setToast({ visible: true, message: t('imagesAdded', { count: result.images.length }) || `已加入 ${result.images.length} 張圖片` });
+        } else {
+          // No images found, try adding the URL as-is (might be an image without extension)
+          addAlbumImage(selectedAlbumId, imageUrl);
+          setAlbumImageIndex(selectedAlbum?.images?.length || 0);
+          setToast({ visible: true, message: t('imageAdded') || 'Image added!' });
+        }
+      } else {
+        // No Electron API, add URL as-is
+        addAlbumImage(selectedAlbumId, imageUrl);
+        setAlbumImageIndex(selectedAlbum?.images?.length || 0);
+        setToast({ visible: true, message: t('imageAdded') || 'Image added!' });
+      }
     }
-  }, [viewMode, selectedAlbumId, addAlbumImage, selectedAlbum?.images?.length, t]);
+  }, [viewMode, selectedAlbumId, addAlbumImage, addAlbumImages, selectedAlbum?.images?.length, t, looksLikeImageUrl]);
 
   const handleCropComplete = async (result) => {
     // Check if this is a virtual image crop (returns crop params instead of image)
@@ -1106,20 +1143,23 @@ function App() {
         const urls = text.split(/[\n,]/).map(u => u.trim()).filter(u => u.startsWith('http'));
         if (urls.length > 0 && viewMode === 'album' && selectedAlbumId) {
           e.preventDefault();
-          // Preload all images immediately (generates thumbnails in background)
-          urls.forEach(url => loadImage(url, PRIORITY_HIGH).catch(() => {}));
-          // Jump to first newly added image
+          // Jump to first newly added image position
           const newIndex = selectedAlbum?.images?.length || 0;
-          urls.forEach(url => addAlbumImage(selectedAlbumId, url));
+          // Add all URLs in single batch (triggers one state update, thumbnails load lazily)
+          addAlbumImages(selectedAlbumId, urls);
           setAlbumImageIndex(newIndex);
-          setToast({ visible: true, message: t('imageAdded') });
+          // Show count if multiple URLs
+          const msg = urls.length > 1
+            ? (t('imagesAdded', { count: urls.length }) || `已加入 ${urls.length} 張圖片`)
+            : t('imageAdded');
+          setToast({ visible: true, message: msg });
         }
       }
     };
 
     window.addEventListener('paste', handlePaste);
     return () => window.removeEventListener('paste', handlePaste);
-  }, [isEditing, viewMode, selectedAlbumId, addAlbumImage, selectedAlbum?.images?.length, t]);
+  }, [isEditing, viewMode, selectedAlbumId, addAlbumImage, addAlbumImages, selectedAlbum?.images?.length, t]);
 
   return (
     <div
@@ -1342,7 +1382,7 @@ function App() {
                                 if (urls.length > 0 && urls.every(url => url.startsWith('http'))) {
                                   e.preventDefault();
                                   const newIndex = albumImages.length;
-                                  urls.forEach(url => selectedAlbumId && addAlbumImage(selectedAlbumId, url));
+                                  if (selectedAlbumId) addAlbumImages(selectedAlbumId, urls);
                                   setAlbumImageIndex(newIndex);
                                 }
                               }
@@ -1351,7 +1391,7 @@ function App() {
                               if (e.key === 'Enter' && e.target.value.trim()) {
                                 const urls = e.target.value.split(/[\n,]/).map(u => u.trim()).filter(Boolean);
                                 const newIndex = albumImages.length;
-                                urls.forEach(url => selectedAlbumId && addAlbumImage(selectedAlbumId, url));
+                                if (selectedAlbumId) addAlbumImages(selectedAlbumId, urls);
                                 setAlbumImageIndex(newIndex);
                                 e.target.value = '';
                               }

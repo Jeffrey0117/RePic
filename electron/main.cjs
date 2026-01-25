@@ -661,6 +661,109 @@ function setupIpcHandlers() {
         return { success: false, error: 'Window not found' };
     });
 
+    // Scrape images from webpage URL
+    ipcMain.handle('scrape-images', async (event, url) => {
+        console.log('[scrape-images] Scraping:', url);
+        try {
+            const protocol = url.startsWith('https') ? https : http;
+            const urlObj = new URL(url);
+
+            const options = {
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.9'
+                }
+            };
+
+            return new Promise((resolve, reject) => {
+                const request = protocol.get(url, options, (response) => {
+                    // Follow redirects
+                    if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
+                        const redirectUrl = response.headers.location.startsWith('http')
+                            ? response.headers.location
+                            : new URL(response.headers.location, url).href;
+                        console.log('[scrape-images] Redirecting to:', redirectUrl);
+                        ipcRenderer?.invoke('scrape-images', redirectUrl).then(resolve).catch(reject);
+                        return;
+                    }
+
+                    if (response.statusCode !== 200) {
+                        resolve({ success: false, error: `HTTP ${response.statusCode}` });
+                        return;
+                    }
+
+                    let html = '';
+                    response.on('data', chunk => html += chunk);
+                    response.on('end', () => {
+                        const images = new Set();
+
+                        // Extract img src
+                        const imgMatches = html.matchAll(/<img[^>]+src=["']([^"']+)["']/gi);
+                        for (const match of imgMatches) {
+                            let imgUrl = match[1];
+                            if (imgUrl.startsWith('//')) imgUrl = 'https:' + imgUrl;
+                            else if (imgUrl.startsWith('/')) imgUrl = urlObj.origin + imgUrl;
+                            else if (!imgUrl.startsWith('http')) continue;
+                            // Filter out tiny images (icons, trackers)
+                            if (!imgUrl.includes('1x1') && !imgUrl.includes('pixel') && !imgUrl.includes('tracking')) {
+                                images.add(imgUrl);
+                            }
+                        }
+
+                        // Extract srcset
+                        const srcsetMatches = html.matchAll(/srcset=["']([^"']+)["']/gi);
+                        for (const match of srcsetMatches) {
+                            const srcset = match[1];
+                            const urls = srcset.split(',').map(s => s.trim().split(/\s+/)[0]);
+                            for (let imgUrl of urls) {
+                                if (imgUrl.startsWith('//')) imgUrl = 'https:' + imgUrl;
+                                else if (imgUrl.startsWith('/')) imgUrl = urlObj.origin + imgUrl;
+                                else if (!imgUrl.startsWith('http')) continue;
+                                images.add(imgUrl);
+                            }
+                        }
+
+                        // Extract og:image
+                        const ogMatch = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i)
+                            || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+property=["']og:image["']/i);
+                        if (ogMatch) {
+                            let imgUrl = ogMatch[1];
+                            if (imgUrl.startsWith('//')) imgUrl = 'https:' + imgUrl;
+                            images.add(imgUrl);
+                        }
+
+                        // Extract background-image URLs
+                        const bgMatches = html.matchAll(/background(?:-image)?:\s*url\(["']?([^"')]+)["']?\)/gi);
+                        for (const match of bgMatches) {
+                            let imgUrl = match[1];
+                            if (imgUrl.startsWith('//')) imgUrl = 'https:' + imgUrl;
+                            else if (imgUrl.startsWith('/')) imgUrl = urlObj.origin + imgUrl;
+                            else if (!imgUrl.startsWith('http')) continue;
+                            images.add(imgUrl);
+                        }
+
+                        const imageList = Array.from(images);
+                        console.log('[scrape-images] Found', imageList.length, 'images');
+                        resolve({ success: true, images: imageList });
+                    });
+                });
+
+                request.on('error', (err) => {
+                    console.error('[scrape-images] Error:', err.message);
+                    resolve({ success: false, error: err.message });
+                });
+                request.setTimeout(15000, () => {
+                    request.destroy();
+                    resolve({ success: false, error: 'Timeout' });
+                });
+            });
+        } catch (e) {
+            console.error('[scrape-images] Error:', e.message);
+            return { success: false, error: e.message };
+        }
+    });
+
     // Batch crop - save cropped image data to file
     ipcMain.handle('batch-crop-save', async (event, { filePath, base64Data, outputMode, originalPath, customDir }) => {
         console.log('[batch-crop-save] Received:', { filePath, outputMode, originalPath, customDir, hasBase64: !!base64Data });

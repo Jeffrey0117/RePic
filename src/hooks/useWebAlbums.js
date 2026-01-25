@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 
 const STORAGE_KEY = 'repic-web-albums';
+const SOFT_DELETE_DAYS = 7; // Days before permanent deletion
+const SOFT_DELETE_MS = SOFT_DELETE_DAYS * 24 * 60 * 60 * 1000;
 
 // Generate unique ID
 const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -16,12 +18,39 @@ const loadFromStorage = () => {
   }
 };
 
+// Clean up expired soft-deleted images (older than SOFT_DELETE_DAYS)
+const cleanupExpiredImages = (albums) => {
+  const now = Date.now();
+  let cleanedCount = 0;
+
+  const cleaned = albums.map(album => {
+    const filteredImages = album.images.filter(img => {
+      if (img.deletedAt && (now - img.deletedAt > SOFT_DELETE_MS)) {
+        cleanedCount++;
+        return false; // Remove permanently
+      }
+      return true;
+    });
+    return { ...album, images: filteredImages };
+  });
+
+  if (cleanedCount > 0) {
+    console.log(`[useWebAlbums] Permanently deleted ${cleanedCount} expired images`);
+  }
+
+  return cleaned;
+};
+
 /**
  * Hook for managing web albums with localStorage persistence
+ * Supports soft delete with 7-day retention
  */
 export const useWebAlbums = () => {
-  // Lazy initialization from localStorage - runs only once
-  const [albums, setAlbums] = useState(() => loadFromStorage());
+  // Lazy initialization from localStorage - runs only once, with cleanup
+  const [albums, setAlbums] = useState(() => {
+    const loaded = loadFromStorage();
+    return cleanupExpiredImages(loaded);
+  });
   const [selectedAlbumId, setSelectedAlbumId] = useState(() => {
     const stored = loadFromStorage();
     return stored.length > 0 ? stored[0].id : null;
@@ -40,11 +69,27 @@ export const useWebAlbums = () => {
     return () => clearTimeout(timeoutId);
   }, [albums]);
 
-  // Get current selected album (memoized)
-  const selectedAlbum = useMemo(() =>
-    albums.find(a => a.id === selectedAlbumId) || null,
-    [albums, selectedAlbumId]
-  );
+  // Periodic cleanup of expired images (every hour)
+  useEffect(() => {
+    const cleanup = () => {
+      setAlbums(prev => cleanupExpiredImages(prev));
+    };
+
+    const intervalId = setInterval(cleanup, 60 * 60 * 1000); // Every hour
+    return () => clearInterval(intervalId);
+  }, []);
+
+  // Get current selected album with active images only (memoized)
+  const selectedAlbum = useMemo(() => {
+    const album = albums.find(a => a.id === selectedAlbumId);
+    if (!album) return null;
+
+    // Filter out soft-deleted images for display
+    return {
+      ...album,
+      images: album.images.filter(img => !img.deletedAt)
+    };
+  }, [albums, selectedAlbumId]);
 
   // Create new album
   const createAlbum = useCallback((name) => {
@@ -120,14 +165,44 @@ export const useWebAlbums = () => {
     return newImages;
   }, []);
 
-  // Remove image from album
+  // Soft delete image (marks with deletedAt, will be permanently removed after 7 days)
   const removeImage = useCallback((albumId, imageId) => {
     setAlbums(prev => prev.map(album =>
       album.id === albumId
-        ? { ...album, images: album.images.filter(img => img.id !== imageId) }
+        ? {
+            ...album,
+            images: album.images.map(img =>
+              img.id === imageId
+                ? { ...img, deletedAt: Date.now() }
+                : img
+            )
+          }
         : album
     ));
   }, []);
+
+  // Restore soft-deleted image
+  const restoreImage = useCallback((albumId, imageId) => {
+    setAlbums(prev => prev.map(album =>
+      album.id === albumId
+        ? {
+            ...album,
+            images: album.images.map(img =>
+              img.id === imageId
+                ? { ...img, deletedAt: undefined }
+                : img
+            )
+          }
+        : album
+    ));
+  }, []);
+
+  // Get deleted images for an album (for potential trash UI)
+  const getDeletedImages = useCallback((albumId) => {
+    const album = albums.find(a => a.id === albumId);
+    if (!album) return [];
+    return album.images.filter(img => img.deletedAt);
+  }, [albums]);
 
   // Update image crop parameters (for virtual image cropping)
   const updateImageCrop = useCallback((albumId, imageId, crop) => {
@@ -175,27 +250,38 @@ export const useWebAlbums = () => {
     setSelectedAlbumId(albumId);
   }, []);
 
-  // Reorder images in album (drag and drop)
+  // Reorder images in album (drag and drop) - only considers active images
   const reorderImages = useCallback((albumId, fromIndex, toIndex) => {
     if (fromIndex === toIndex) return;
 
     setAlbums(prev => prev.map(album => {
       if (album.id !== albumId) return album;
 
-      const images = [...album.images];
-      const [removed] = images.splice(fromIndex, 1);
-      images.splice(toIndex, 0, removed);
+      // Get active images (not deleted)
+      const activeImages = album.images.filter(img => !img.deletedAt);
+      const deletedImages = album.images.filter(img => img.deletedAt);
 
-      return { ...album, images };
+      // Reorder active images
+      const [removed] = activeImages.splice(fromIndex, 1);
+      activeImages.splice(toIndex, 0, removed);
+
+      // Combine back with deleted images at the end
+      return { ...album, images: [...activeImages, ...deletedImages] };
     }));
   }, []);
 
-  // Export all albums to JSON
+  // Export all albums to JSON (excludes soft-deleted images)
   const exportAlbums = useCallback(() => {
+    // Clean export: remove deleted images entirely
+    const cleanAlbums = albums.map(album => ({
+      ...album,
+      images: album.images.filter(img => !img.deletedAt)
+    }));
+
     const data = {
       version: 1,
       exportedAt: Date.now(),
-      albums
+      albums: cleanAlbums
     };
     const json = JSON.stringify(data, null, 2);
     const blob = new Blob([json], { type: 'application/json' });
@@ -244,6 +330,8 @@ export const useWebAlbums = () => {
     addImage,
     addImages,
     removeImage,
+    restoreImage,
+    getDeletedImages,
     updateImageCrop,
     clearImageCrop,
     reorderImages,

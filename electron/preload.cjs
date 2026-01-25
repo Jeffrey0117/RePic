@@ -230,5 +230,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // Get always on top status
     getAlwaysOnTop: async () => {
         return await ipcRenderer.invoke('get-always-on-top');
+    },
+
+    // Scrape images from webpage URL
+    scrapeImages: async (url) => {
+        if (!url || typeof url !== 'string' || !url.startsWith('http')) {
+            return { success: false, error: 'Invalid URL' };
+        }
+        return await ipcRenderer.invoke('scrape-images', url);
     }
 });
