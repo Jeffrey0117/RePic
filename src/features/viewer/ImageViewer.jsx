@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import useI18n from '../../hooks/useI18n';
+import { getCached } from '../../utils/imageLoader';
 
 const electronAPI = window.electronAPI || null;
 
@@ -14,20 +15,36 @@ export const ImageViewer = ({ src, crop }) => {
     const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
     const [proxiedSrc, setProxiedSrc] = useState(null);
     const [loadFailed, setLoadFailed] = useState(false);
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(false);
 
-    // Reset zoom, position, proxied src, and failed state when image changes
+    // Reset state when src changes
     useEffect(() => {
+        if (!src) return;
+
         setScale(1);
         setPosition({ x: 0, y: 0 });
         setProxiedSrc(null);
         setLoadFailed(false);
-        // Only show loading for web images, local files load fast
-        const isLocalFile = src?.startsWith('file://') || src?.startsWith('data:');
-        setIsLoading(!isLocalFile);
+
+        // Local files: no loading state needed
+        const isLocal = src.startsWith('file://') || src.startsWith('data:');
+        if (isLocal) {
+            setIsLoading(false);
+            return;
+        }
+
+        // Web images: check cache first
+        const cached = getCached(src);
+        if (cached) {
+            setProxiedSrc(cached);
+            setIsLoading(false);
+        } else {
+            // Will load via img tag directly
+            setIsLoading(true);
+        }
     }, [src]);
 
-    // Actual image source (use proxied if available)
+    // Actual image source (cached > proxied > original)
     const imageSrc = proxiedSrc || src;
 
     // Handle scroll wheel zoom - zoom toward mouse position
@@ -156,7 +173,7 @@ export const ImageViewer = ({ src, crop }) => {
             )}
 
             {/* Unsaved indicator */}
-            {imageSrc.startsWith('data:') && !proxiedSrc && (
+            {src?.startsWith('data:') && (
                 <div className="absolute top-4 right-4 z-10 bg-primary/80 backdrop-blur-md text-[10px] text-white px-2 py-1 rounded-full uppercase tracking-widest font-bold shadow-lg">
                     Unsaved
                 </div>
@@ -179,14 +196,13 @@ export const ImageViewer = ({ src, crop }) => {
                     ref={imageRef}
                     src={imageSrc}
                     alt="View"
-                    className={`block select-none rounded-md transition-opacity duration-200 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
+                    className={`block select-none rounded-md transition-opacity duration-150 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
                     style={{
                         maxWidth: '100%',
                         maxHeight: '100%',
                         objectFit: 'contain',
                         transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
                         transition: isDragging ? 'none' : 'transform 0.15s ease-out',
-                        // Apply crop using clip-path if crop params exist
                         ...(crop && {
                             clipPath: `inset(${crop.y}% ${100 - crop.x - crop.width}% ${100 - crop.y - crop.height}% ${crop.x}%)`
                         })
@@ -195,24 +211,16 @@ export const ImageViewer = ({ src, crop }) => {
                     referrerPolicy="no-referrer"
                     onLoad={() => setIsLoading(false)}
                     onError={async () => {
-                        // If image fails to load and we haven't tried proxy yet
-                        if (src.startsWith('http') && !proxiedSrc && electronAPI?.proxyImage) {
-                            console.log('[ImageViewer] Image failed, trying proxy:', src);
+                        // If failed and haven't tried proxy yet
+                        if (src?.startsWith('http') && !proxiedSrc && electronAPI?.proxyImage) {
                             const result = await electronAPI.proxyImage(src);
                             if (result.success) {
                                 setProxiedSrc(result.data);
-                            } else {
-                                setIsLoading(false);
-                                setLoadFailed(true);
+                                return;
                             }
-                        } else if (proxiedSrc) {
-                            // Proxied image also failed
-                            setIsLoading(false);
-                            setLoadFailed(true);
-                        } else {
-                            setIsLoading(false);
-                            setLoadFailed(true);
                         }
+                        setIsLoading(false);
+                        setLoadFailed(true);
                     }}
                 />
             )}
