@@ -3,7 +3,7 @@ import useI18n from '../../hooks/useI18n';
 
 const electronAPI = window.electronAPI || null;
 
-export const ImageViewer = ({ src }) => {
+export const ImageViewer = ({ src, crop }) => {
     const { t } = useI18n();
     const containerRef = useRef(null);
     const imageRef = useRef(null);
@@ -161,7 +161,11 @@ export const ImageViewer = ({ src }) => {
                     maxHeight: '100%',
                     objectFit: 'contain',
                     transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
-                    transition: isDragging ? 'none' : 'transform 0.15s ease-out'
+                    transition: isDragging ? 'none' : 'transform 0.15s ease-out',
+                    // Apply crop using clip-path if crop params exist
+                    ...(crop && {
+                        clipPath: `inset(${crop.y}% ${100 - crop.x - crop.width}% ${100 - crop.y - crop.height}% ${crop.x}%)`
+                    })
                 }}
                 draggable={false}
             />

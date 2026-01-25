@@ -777,7 +777,7 @@ function App() {
                   className="absolute inset-0 z-10 bg-[#0f0f0f]"
                 >
                   <div className="w-full h-full p-4">
-                    <ImageViewer src={currentAlbumImage} />
+                    <ImageViewer src={currentAlbumImage} crop={albumImages[safeAlbumIndex]?.crop} />
                   </div>
                 </motion.div>
               ) : (
