@@ -1133,8 +1133,8 @@ function App() {
             </svg>
           </div>
           <div className="text-center">
-            <p className="text-xl font-semibold text-white drop-shadow-md">放開以新增圖片</p>
-            <p className="text-sm text-white/80 mt-1">拖曳圖片或網址到此處</p>
+            <p className="text-xl font-semibold drop-shadow-md" style={{ color: '#ffffff' }}>放開以新增圖片</p>
+            <p className="text-sm mt-1" style={{ color: 'rgba(255,255,255,0.8)' }}>拖曳圖片或網址到此處</p>
           </div>
         </div>
       </div>
