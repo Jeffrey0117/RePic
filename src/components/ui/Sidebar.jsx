@@ -103,12 +103,11 @@ export const Sidebar = ({
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [isHorizontal, currentIndex, files.length, onSelect]);
 
-    // Drag to scroll (carousel effect) - only when middle mouse or explicit drag
+    // Drag to scroll (carousel effect)
     const handleScrollDragStart = useCallback((e) => {
-        // Only allow drag scroll with middle mouse button (wheel click)
-        // Left click should select, not drag scroll
-        if (e.button !== 1) return; // 1 = middle button
         if (isReorderMode || isMultiSelectMode) return;
+        // Don't start drag scroll if clicking on a thumbnail (let it select)
+        if (e.target.closest('[data-thumb]')) return;
 
         const container = scrollContainerRef.current;
         if (!container) return;
@@ -455,6 +454,7 @@ export const Sidebar = ({
                     return (
                         <motion.div
                             key={isWeb ? (typeof file === 'string' ? file : file.id) : `${file}-${cacheVersion}`}
+                            data-thumb="true"
                             whileHover={{ scale: isMultiSelectMode || isDragging ? 1 : 1.05 }}
                             whileTap={{ scale: isMultiSelectMode ? 1 : 0.95 }}
                             onClick={() => {

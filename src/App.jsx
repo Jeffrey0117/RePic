@@ -94,6 +94,7 @@ function App() {
   // Drag-drop state for album mode
   const [isDragOver, setIsDragOver] = useState(false);
   const dragCounter = useRef(0);
+  const isInternalDrag = useRef(false);
 
   // Export dialog state
   const [showExportDialog, setShowExportDialog] = useState(false);
@@ -206,12 +207,32 @@ function App() {
     }
   }, [viewMode, currentPath, loadFolder]);
 
+  // Track internal drag start (from sidebar thumbnails or image viewer)
+  useEffect(() => {
+    const handleDragStart = (e) => {
+      // If drag started from within our app, mark it as internal
+      if (e.target.closest('[data-app-root]')) {
+        isInternalDrag.current = true;
+      }
+    };
+    const handleDragEnd = () => {
+      isInternalDrag.current = false;
+    };
+    window.addEventListener('dragstart', handleDragStart);
+    window.addEventListener('dragend', handleDragEnd);
+    return () => {
+      window.removeEventListener('dragstart', handleDragStart);
+      window.removeEventListener('dragend', handleDragEnd);
+    };
+  }, []);
+
   // Handle drag-drop for album mode (accept images from web browsers)
   const handleDragEnter = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
     dragCounter.current++;
-    if (viewMode === 'album' && selectedAlbumId) {
+    // Only show overlay for external drags (not from within the app)
+    if (viewMode === 'album' && selectedAlbumId && !isInternalDrag.current) {
       setIsDragOver(true);
     }
   }, [viewMode, selectedAlbumId]);
@@ -234,6 +255,7 @@ function App() {
     e.preventDefault();
     e.stopPropagation();
     dragCounter.current = 0;
+    isInternalDrag.current = false;
     setIsDragOver(false);
 
     if (viewMode !== 'album' || !selectedAlbumId) return;
@@ -1089,6 +1111,7 @@ function App() {
 
   return (
     <div
+      data-app-root="true"
       className="h-screen w-screen bg-[#0A0A0A] text-white overflow-hidden flex flex-col select-none relative"
       onDragEnter={handleDragEnter}
       onDragOver={handleDragOver}
