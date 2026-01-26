@@ -684,6 +684,19 @@ function App() {
     setIsMultiSelectMode(false);
   }, []);
 
+  // Select/deselect all images
+  const handleSelectAll = useCallback((isAllSelected) => {
+    if (!selectedAlbum) return;
+    if (isAllSelected) {
+      // Deselect all
+      setSelectedImageIds(new Set());
+    } else {
+      // Select all
+      const allIds = new Set(selectedAlbum.images.map(img => img.id));
+      setSelectedImageIds(allIds);
+    }
+  }, [selectedAlbum]);
+
   // Batch download selected images (uses Go for speed)
   const handleBatchDownload = useCallback(async () => {
     if (selectedImageIds.size === 0 || !selectedAlbum) return;
@@ -1469,6 +1482,7 @@ function App() {
                 onDeleteSelected={handleBatchDelete}
                 onDownloadSelected={handleBatchDownload}
                 onUploadSelected={handleBatchUpload}
+                onSelectAll={handleSelectAll}
                 onReorder={viewMode === 'album' ? (from, to) => reorderImages(selectedAlbumId, from, to) : undefined}
                 onContextMenu={viewMode === 'album' ? (e, image) => handleImageContextMenu(e, image, selectedAlbum) : undefined}
                 position={sidebarPosition}
@@ -1803,6 +1817,41 @@ function App() {
                 if (album) {
                   selectAlbum(album.id);
                   setShowExportDialog(true);
+                }
+              }
+            },
+            {
+              label: t('downloadAll'),
+              icon: Download,
+              onClick: async () => {
+                const album = contextMenu.target?.album;
+                if (!album || album.images.length === 0) return;
+
+                const electronAPI = getElectronAPI();
+                if (!electronAPI) return;
+
+                const folder = await electronAPI.selectDirectory();
+                if (!folder) return;
+
+                const urls = album.images.map(img => img.url).filter(url => url?.startsWith('http'));
+                if (urls.length === 0) {
+                  setToast({ visible: true, message: t('noImagesFound') });
+                  return;
+                }
+
+                setToast({ visible: true, message: t('processing') });
+
+                if (electronAPI.batchDownloadImages) {
+                  const result = await electronAPI.batchDownloadImages(urls, folder, 8);
+                  if (result.success || result.completed > 0) {
+                    if (result.failed > 0) {
+                      setToast({ visible: true, message: t('completedMessage', { success: result.completed, failed: result.failed }) });
+                    } else {
+                      setToast({ visible: true, message: t('downloadSuccess') + ` (${result.completed})` });
+                    }
+                  } else {
+                    setToast({ visible: true, message: t('downloadFailed') });
+                  }
                 }
               }
             },

@@ -38,6 +38,7 @@ export const Sidebar = ({
     onDeleteSelected,
     onDownloadSelected,
     onUploadSelected,
+    onSelectAll,
     onReorder,
     onContextMenu,
     position = 'left' // 'left' or 'bottom'
@@ -386,14 +387,25 @@ export const Sidebar = ({
                         <div className={`flex ${isHorizontal ? 'flex-col items-center gap-2' : 'flex-col gap-1'}`}>
                             <div className={`flex items-center ${isHorizontal ? 'flex-col gap-1' : 'justify-between w-full'}`}>
                                 <span className="text-[10px] text-white/60">
-                                    {selectedIds.size} 選中
+                                    {selectedIds.size}/{files.length}
                                 </span>
-                                <button
-                                    onClick={onExitMultiSelect}
-                                    className="text-[10px] text-white/60 hover:text-white px-2 py-1 rounded hover:bg-white/10"
-                                >
-                                    ✕
-                                </button>
+                                <div className="flex items-center gap-1">
+                                    {onSelectAll && (
+                                        <button
+                                            onClick={() => onSelectAll(selectedIds.size === files.length)}
+                                            className="text-[10px] text-primary hover:text-primary/80 px-1.5 py-0.5 rounded hover:bg-primary/10"
+                                            title={selectedIds.size === files.length ? '取消全選' : '全選'}
+                                        >
+                                            {selectedIds.size === files.length ? '☐' : '☑'}
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={onExitMultiSelect}
+                                        className="text-[10px] text-white/60 hover:text-white px-1.5 py-0.5 rounded hover:bg-white/10"
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
                             </div>
                             <div className={`flex ${isHorizontal ? 'flex-col' : 'flex-row'} items-center gap-1`}>
                                 <button
