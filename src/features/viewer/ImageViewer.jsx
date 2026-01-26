@@ -75,10 +75,29 @@ export const ImageViewer = ({ src, crop, annotations = [] }) => {
         if (cached) {
             setProxiedSrc(cached);
             setIsLoading(false);
-        } else {
-            // Will load via img tag directly
-            setIsLoading(true);
+            return;
         }
+
+        // Will load via img tag directly
+        setIsLoading(true);
+        let cancelled = false;
+
+        // Timeout: if image doesn't load in 5s, try proxy (for ERR_HTTP2_PROTOCOL_ERROR etc.)
+        const timeoutId = setTimeout(async () => {
+            if (cancelled) return;
+            if (electronAPI?.proxyImage) {
+                console.log('[ImageViewer] Timeout, trying proxy:', src);
+                const result = await electronAPI.proxyImage(src);
+                if (!cancelled && result.success) {
+                    setProxiedSrc(result.data);
+                }
+            }
+        }, 5000);
+
+        return () => {
+            cancelled = true;
+            clearTimeout(timeoutId);
+        };
     }, [src]);
 
     // Actual image source (cached > proxied > original)

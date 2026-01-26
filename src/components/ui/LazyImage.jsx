@@ -80,14 +80,34 @@ export const LazyImage = memo(({
 
         setIsLoading(true);
         setHasError(false);
+        let cancelled = false;
 
         const priority = isHighPriority ? PRIORITY_HIGH : PRIORITY_NORMAL;
 
         // Use thumbnail loader for sidebar (faster, smaller)
         const loader = useThumbnail ? loadThumbnail(src) : loadImage(src, priority);
 
+        // Timeout: if image doesn't load in 5s, try proxy
+        const timeoutId = setTimeout(async () => {
+            if (cancelled || loadedSrc) return;
+            console.log('[LazyImage] Timeout, trying proxy:', src);
+            if (electronAPI?.proxyImage) {
+                try {
+                    const result = await electronAPI.proxyImage(src);
+                    if (!cancelled && result.success) {
+                        cacheProxyResult(src, result.data);
+                        setLoadedSrc(result.data);
+                        setIsLoading(false);
+                        onLoad?.();
+                    }
+                } catch (e) {}
+            }
+        }, 5000);
+
         loader
             .then((data) => {
+                clearTimeout(timeoutId);
+                if (cancelled) return;
                 if (data) {
                     setLoadedSrc(data);
                     setIsLoading(false);
@@ -97,6 +117,8 @@ export const LazyImage = memo(({
                 }
             })
             .catch(async (err) => {
+                clearTimeout(timeoutId);
+                if (cancelled) return;
                 console.log('[LazyImage] Load failed, trying proxy:', src);
                 // Try proxy if direct load fails (CORS issues)
                 if (electronAPI?.proxyImage) {
@@ -118,6 +140,11 @@ export const LazyImage = memo(({
                 setIsLoading(false);
                 onError?.(err);
             });
+
+        return () => {
+            cancelled = true;
+            clearTimeout(timeoutId);
+        };
     }, [isVisible, src, loadedSrc, isHighPriority, useThumbnail, onLoad, onError]);
 
     // Reset when src changes - check cache first
