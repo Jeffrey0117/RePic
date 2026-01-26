@@ -361,14 +361,17 @@ function App() {
       setAlbumImageIndex(selectedAlbum?.images?.length || 0);
       setToast({ visible: true, message: t('imageAdded') || 'Image added!' });
     } else {
-      // Webpage URL detected - ask user for confirmation first
+      // Webpage URL detected - prefetch while asking for confirmation
       const electronAPI = getElectronAPI();
       if (!electronAPI?.scrapeImages) {
         setToast({ visible: true, message: t('webpageNotSupported') || '不支援網頁拖放（請拖放圖片）' });
         return;
       }
 
-      // Truncate URL for display if too long
+      // Start scraping immediately (prefetch while user decides)
+      const scrapePromise = electronAPI.scrapeImages(imageUrl);
+
+      // Show confirmation dialog
       const displayUrl = imageUrl.length > 60 ? imageUrl.slice(0, 57) + '...' : imageUrl;
       const confirmMessage = `${t('scrapeConfirmMessage')}\n\n${displayUrl}`;
 
@@ -378,11 +381,11 @@ function App() {
         cancelText: t('cancel')
       });
 
-      if (!confirmed) return;
+      if (!confirmed) return; // Discard prefetched result
 
-      // User confirmed - proceed with scraping
+      // User confirmed - use prefetched result (likely already done!)
       setToast({ visible: true, message: t('scraping') || '正在抓取圖片...' });
-      const result = await electronAPI.scrapeImages(imageUrl);
+      const result = await scrapePromise;
       if (result.success && result.images?.length > 0) {
         const newIndex = selectedAlbum?.images?.length || 0;
         addAlbumImages(selectedAlbumId, result.images);
@@ -1368,8 +1371,11 @@ function App() {
           if (urls.length === 1 && !looksLikeImageUrl(urls[0])) {
             const electronAPI = getElectronAPI();
             if (electronAPI?.scrapeImages) {
-              // Ask user for confirmation
               const webpageUrl = urls[0];
+
+              // Prefetch while showing confirmation
+              const scrapePromise = electronAPI.scrapeImages(webpageUrl);
+
               const displayUrl = webpageUrl.length > 60 ? webpageUrl.slice(0, 57) + '...' : webpageUrl;
               const confirmMessage = `${t('scrapeConfirmMessage')}\n\n${displayUrl}`;
 
@@ -1382,7 +1388,7 @@ function App() {
               if (!confirmed) return;
 
               setToast({ visible: true, message: t('scraping') || '正在抓取圖片...' });
-              const result = await electronAPI.scrapeImages(webpageUrl);
+              const result = await scrapePromise;
               if (result.success && result.images?.length > 0) {
                 const newIndex = selectedAlbum?.images?.length || 0;
                 addAlbumImages(selectedAlbumId, result.images);
@@ -1467,7 +1473,9 @@ function App() {
             return;
           }
 
-          // Ask user for confirmation
+          // Prefetch while showing confirmation
+          const scrapePromise = electronAPI.scrapeImages(url);
+
           const displayUrl = url.length > 60 ? url.slice(0, 57) + '...' : url;
           const confirmMessage = `${t('scrapeConfirmMessage')}\n\n${displayUrl}`;
           const confirmed = await confirm(confirmMessage, {
@@ -1479,7 +1487,7 @@ function App() {
           if (!confirmed) return;
 
           setToast({ visible: true, message: t('scraping') || '正在抓取圖片...' });
-          const result = await electronAPI.scrapeImages(url);
+          const result = await scrapePromise;
           if (result.success && result.images?.length > 0) {
             const newIndex = albumImages.length;
             addAlbumImages(selectedAlbumId, result.images);
