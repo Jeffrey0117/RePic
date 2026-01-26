@@ -27,3 +27,6 @@ release/
 # Native SDK (libvips) - too large for git
 native/
 nul
+
+# Go scraper binary
+scraper/*.exe

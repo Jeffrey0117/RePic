@@ -1,4 +1,5 @@
 const { app, BrowserWindow, Menu, ipcMain, dialog, nativeImage, session } = require('electron');
+const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -776,8 +777,70 @@ function setupIpcHandlers() {
         }
     };
 
+    // Try Go scraper first (faster), fallback to Node.js
+    const scrapeWithGo = (url) => {
+        return new Promise((resolve) => {
+            const scraperPath = path.join(__dirname, '..', 'scraper', 'scraper.exe');
+
+            // Check if Go scraper exists
+            if (!fs.existsSync(scraperPath)) {
+                console.log('[scrape-images] Go scraper not found, using Node.js');
+                resolve(null); // Will fallback to Node.js
+                return;
+            }
+
+            console.log('[scrape-images] Using Go scraper');
+            const proc = spawn(scraperPath, ['--url', url]);
+            let stdout = '';
+            let stderr = '';
+
+            proc.stdout.on('data', (data) => {
+                stdout += data.toString();
+            });
+
+            proc.stderr.on('data', (data) => {
+                stderr += data.toString();
+            });
+
+            proc.on('close', (code) => {
+                if (code === 0 && stdout) {
+                    try {
+                        const result = JSON.parse(stdout);
+                        console.log('[scrape-images] Go scraper found', result.images?.length || 0, 'images');
+                        resolve(result);
+                    } catch (e) {
+                        console.error('[scrape-images] Go scraper parse error:', e);
+                        resolve(null);
+                    }
+                } else {
+                    console.log('[scrape-images] Go scraper failed:', stderr || `exit code ${code}`);
+                    resolve(null);
+                }
+            });
+
+            proc.on('error', (err) => {
+                console.error('[scrape-images] Go scraper spawn error:', err);
+                resolve(null);
+            });
+
+            // Timeout after 20 seconds
+            setTimeout(() => {
+                proc.kill();
+                resolve(null);
+            }, 20000);
+        });
+    };
+
     // Scrape images from webpage URL - IPC handler
     ipcMain.handle('scrape-images', async (event, url) => {
+        // Try Go scraper first
+        const goResult = await scrapeWithGo(url);
+        if (goResult && goResult.success) {
+            return goResult;
+        }
+
+        // Fallback to Node.js scraper
+        console.log('[scrape-images] Falling back to Node.js scraper');
         return scrapeImagesFromUrl(url);
     });
 
