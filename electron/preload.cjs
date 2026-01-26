@@ -182,6 +182,17 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return result.available;
     },
 
+    // Native image compression (via Go)
+    nativeCompress: async (inputPath, outputPath, quality = 85) => {
+        if (!isValidPath(inputPath) || !isValidPath(outputPath)) {
+            return { success: false, error: 'Invalid path' };
+        }
+        if (typeof quality !== 'number' || quality < 1 || quality > 100) {
+            return { success: false, error: 'Invalid quality (1-100)' };
+        }
+        return await ipcRenderer.invoke('native-compress', { inputPath, outputPath, quality });
+    },
+
     // Read .repic virtual image file
     readRepicFile: async (filePath) => {
         if (!isValidPath(filePath)) {

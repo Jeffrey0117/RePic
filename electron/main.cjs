@@ -501,14 +501,87 @@ function setupIpcHandlers() {
         return result;
     });
 
-    // Native crop - not available (using browser canvas instead)
-    ipcMain.handle('native-crop', async () => {
-        return { success: false, error: 'Native processing not available', fallback: true };
+    // Native crop using Go
+    ipcMain.handle('native-crop', async (event, { inputPath, outputPath, crop }) => {
+        const scraperPath = path.join(__dirname, '..', 'scraper', 'repic-scraper.exe');
+        if (!fs.existsSync(scraperPath)) {
+            return { success: false, error: 'Go processor not found', fallback: true };
+        }
+
+        return new Promise((resolve) => {
+            const args = [
+                '--crop',
+                '--input', inputPath,
+                '--output', outputPath,
+                '--x', String(Math.round(crop.x)),
+                '--y', String(Math.round(crop.y)),
+                '--w', String(Math.round(crop.width)),
+                '--h', String(Math.round(crop.height))
+            ];
+
+            const proc = spawn(scraperPath, args);
+            let stdout = '';
+
+            proc.stdout.on('data', (data) => { stdout += data.toString(); });
+            proc.stderr.on('data', (data) => { console.error('[native-crop] stderr:', data.toString()); });
+
+            proc.on('close', (code) => {
+                if (code === 0 && stdout) {
+                    try {
+                        const result = JSON.parse(stdout.trim());
+                        resolve(result);
+                    } catch (e) {
+                        resolve({ success: false, error: 'Parse error' });
+                    }
+                } else {
+                    resolve({ success: false, error: `Exit code ${code}` });
+                }
+            });
+
+            proc.on('error', (err) => {
+                resolve({ success: false, error: err.message });
+            });
+        });
     });
 
-    // Check if native processing is available
+    // Native compress using Go
+    ipcMain.handle('native-compress', async (event, { inputPath, outputPath, quality }) => {
+        const scraperPath = path.join(__dirname, '..', 'scraper', 'repic-scraper.exe');
+        if (!fs.existsSync(scraperPath)) {
+            return { success: false, error: 'Go processor not found' };
+        }
+
+        return new Promise((resolve) => {
+            const args = [
+                '--compress',
+                '--input', inputPath,
+                '--output', outputPath,
+                '--quality', String(quality || 85)
+            ];
+
+            const proc = spawn(scraperPath, args);
+            let stdout = '';
+
+            proc.stdout.on('data', (data) => { stdout += data.toString(); });
+            proc.on('close', (code) => {
+                if (code === 0 && stdout) {
+                    try {
+                        resolve(JSON.parse(stdout.trim()));
+                    } catch (e) {
+                        resolve({ success: false, error: 'Parse error' });
+                    }
+                } else {
+                    resolve({ success: false, error: `Exit code ${code}` });
+                }
+            });
+            proc.on('error', (err) => resolve({ success: false, error: err.message }));
+        });
+    });
+
+    // Check if native processing is available (Go scraper)
     ipcMain.handle('native-available', () => {
-        return { available: false };
+        const scraperPath = path.join(__dirname, '..', 'scraper', 'repic-scraper.exe');
+        return { available: fs.existsSync(scraperPath) };
     });
 
     // Read .repic file

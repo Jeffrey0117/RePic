@@ -9,7 +9,7 @@ import (
 	"image"
 	"image/gif"
 	"image/jpeg"
-	_ "image/png" // PNG decode support
+	"image/png"
 	"io"
 	"net/http"
 	"net/url"
@@ -117,9 +117,37 @@ func main() {
 	base64Flag := flag.Bool("base64", false, "Output thumbnails as base64 instead of files")
 	streamFlag := flag.Bool("stream", false, "Stream results as NDJSON (one item per line)")
 
+	// Crop mode
+	cropFlag := flag.Bool("crop", false, "Enable crop mode")
+	inputFlag := flag.String("input", "", "Input file path")
+	cropXFlag := flag.Int("x", 0, "Crop X position (pixels)")
+	cropYFlag := flag.Int("y", 0, "Crop Y position (pixels)")
+	cropWFlag := flag.Int("w", 0, "Crop width (pixels)")
+	cropHFlag := flag.Int("h", 0, "Crop height (pixels)")
+
+	// Compress mode
+	compressFlag := flag.Bool("compress", false, "Enable compress mode")
+	qualityFlag := flag.Int("quality", 85, "JPEG quality (1-100)")
+
 	flag.Parse()
 
-	if *thumbnailFlag {
+	if *cropFlag {
+		// Crop mode
+		if *inputFlag == "" || *outputFlag == "" {
+			outputJSON(map[string]interface{}{"success": false, "error": "input and output required"})
+			return
+		}
+		result := cropImage(*inputFlag, *outputFlag, *cropXFlag, *cropYFlag, *cropWFlag, *cropHFlag)
+		outputJSON(result)
+	} else if *compressFlag {
+		// Compress mode
+		if *inputFlag == "" || *outputFlag == "" {
+			outputJSON(map[string]interface{}{"success": false, "error": "input and output required"})
+			return
+		}
+		result := compressImage(*inputFlag, *outputFlag, *qualityFlag)
+		outputJSON(result)
+	} else if *thumbnailFlag {
 		// Thumbnail generation mode
 		if *filesFlag == "" {
 			outputThumbnailError("files are required for thumbnail mode")
@@ -683,4 +711,149 @@ func addImage(imageSet map[string]bool, mu *sync.Mutex, imgURL string, baseURL *
 	mu.Lock()
 	imageSet[imgURL] = true
 	mu.Unlock()
+}
+
+// ============ HELPERS ============
+
+func outputJSON(data interface{}) {
+	json.NewEncoder(os.Stdout).Encode(data)
+}
+
+// ============ CROP MODE ============
+
+func cropImage(inputPath, outputPath string, x, y, w, h int) map[string]interface{} {
+	result := make(map[string]interface{})
+
+	f, err := os.Open(inputPath)
+	if err != nil {
+		result["success"] = false
+		result["error"] = err.Error()
+		return result
+	}
+	defer f.Close()
+
+	img, format, err := image.Decode(f)
+	if err != nil {
+		result["success"] = false
+		result["error"] = fmt.Sprintf("decode: %v", err)
+		return result
+	}
+
+	bounds := img.Bounds()
+	origW := bounds.Dx()
+	origH := bounds.Dy()
+
+	// Validate crop bounds
+	if w <= 0 || h <= 0 || x < 0 || y < 0 || x+w > origW || y+h > origH {
+		result["success"] = false
+		result["error"] = fmt.Sprintf("invalid crop bounds: x=%d y=%d w=%d h=%d (image: %dx%d)", x, y, w, h, origW, origH)
+		return result
+	}
+
+	// Create cropped image using SubImage (zero-copy if possible)
+	type subImager interface {
+		SubImage(r image.Rectangle) image.Image
+	}
+
+	var cropped image.Image
+	if si, ok := img.(subImager); ok {
+		cropped = si.SubImage(image.Rect(x, y, x+w, y+h))
+	} else {
+		// Fallback: copy pixels
+		dst := image.NewRGBA(image.Rect(0, 0, w, h))
+		draw.Draw(dst, dst.Bounds(), img, image.Pt(x, y), draw.Src)
+		cropped = dst
+	}
+
+	// Create output file
+	out, err := os.Create(outputPath)
+	if err != nil {
+		result["success"] = false
+		result["error"] = err.Error()
+		return result
+	}
+	defer out.Close()
+
+	// Encode based on output extension or original format
+	ext := strings.ToLower(filepath.Ext(outputPath))
+	switch ext {
+	case ".png":
+		err = png.Encode(out, cropped)
+	case ".gif":
+		err = gif.Encode(out, cropped, nil)
+	default:
+		err = jpeg.Encode(out, cropped, &jpeg.Options{Quality: 95})
+	}
+
+	if err != nil {
+		result["success"] = false
+		result["error"] = fmt.Sprintf("encode: %v", err)
+		return result
+	}
+
+	result["success"] = true
+	result["output"] = outputPath
+	result["width"] = w
+	result["height"] = h
+	result["format"] = format
+	return result
+}
+
+// ============ COMPRESS MODE ============
+
+func compressImage(inputPath, outputPath string, quality int) map[string]interface{} {
+	result := make(map[string]interface{})
+
+	f, err := os.Open(inputPath)
+	if err != nil {
+		result["success"] = false
+		result["error"] = err.Error()
+		return result
+	}
+	defer f.Close()
+
+	img, format, err := image.Decode(f)
+	if err != nil {
+		result["success"] = false
+		result["error"] = fmt.Sprintf("decode: %v", err)
+		return result
+	}
+
+	// Clamp quality
+	if quality < 1 {
+		quality = 1
+	} else if quality > 100 {
+		quality = 100
+	}
+
+	// Create output file
+	out, err := os.Create(outputPath)
+	if err != nil {
+		result["success"] = false
+		result["error"] = err.Error()
+		return result
+	}
+	defer out.Close()
+
+	// Always output JPEG for compression
+	err = jpeg.Encode(out, img, &jpeg.Options{Quality: quality})
+	if err != nil {
+		result["success"] = false
+		result["error"] = fmt.Sprintf("encode: %v", err)
+		return result
+	}
+
+	// Get file size
+	info, _ := os.Stat(outputPath)
+	var size int64
+	if info != nil {
+		size = info.Size()
+	}
+
+	result["success"] = true
+	result["output"] = outputPath
+	result["quality"] = quality
+	result["size"] = size
+	result["format"] = format
+	return result
 }
