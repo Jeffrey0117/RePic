@@ -39,6 +39,8 @@ export const Sidebar = ({
     onDownloadSelected,
     onUploadSelected,
     onSelectAll,
+    onMoveUp,
+    onMoveDown,
     onReorder,
     onContextMenu,
     position = 'left' // 'left' or 'bottom'
@@ -388,7 +390,7 @@ export const Sidebar = ({
                             {/* Row 1: Count + Close */}
                             <div className={`flex items-center ${isHorizontal ? 'flex-col gap-1' : 'justify-between w-full'}`}>
                                 <span className="text-[10px] text-white/60">
-                                    已選 {selectedIds.size}/{files.length}
+                                    {selectedIds.size}/{files.length}
                                 </span>
                                 <button
                                     onClick={onExitMultiSelect}
@@ -397,40 +399,42 @@ export const Sidebar = ({
                                     ✕
                                 </button>
                             </div>
-                            {/* Row 2: Actions */}
-                            <div className={`flex ${isHorizontal ? 'flex-col' : 'flex-row'} items-center gap-1 w-full`}>
+                            {/* Row 2: Move arrows + Select all */}
+                            <div className={`flex ${isHorizontal ? 'flex-col' : 'flex-row'} items-center justify-between w-full`}>
+                                <div className="flex items-center gap-0.5">
+                                    {onMoveUp && (
+                                        <button
+                                            onClick={onMoveUp}
+                                            disabled={selectedIds.size === 0}
+                                            className="text-[9px] text-white/50 hover:text-white px-1 py-0.5 rounded hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed"
+                                            title="上移"
+                                        >
+                                            ↑
+                                        </button>
+                                    )}
+                                    {onMoveDown && (
+                                        <button
+                                            onClick={onMoveDown}
+                                            disabled={selectedIds.size === 0}
+                                            className="text-[9px] text-white/50 hover:text-white px-1 py-0.5 rounded hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed"
+                                            title="下移"
+                                        >
+                                            ↓
+                                        </button>
+                                    )}
+                                </div>
                                 {onSelectAll && (
                                     <button
                                         onClick={() => onSelectAll(selectedIds.size === files.length)}
-                                        className={`text-[10px] px-2 py-1 rounded transition-colors ${
-                                            isHorizontal ? 'w-full' : 'flex-1'
-                                        } ${
+                                        className={`text-[10px] px-1.5 py-0.5 rounded transition-colors ${
                                             selectedIds.size === files.length
-                                                ? 'text-white/60 hover:text-white hover:bg-white/10'
+                                                ? 'text-white/50 hover:text-white hover:bg-white/10'
                                                 : 'text-primary hover:bg-primary/10'
                                         }`}
                                     >
                                         {selectedIds.size === files.length ? '取消' : '全選'}
                                     </button>
                                 )}
-                                <button
-                                    onClick={onDownloadSelected}
-                                    disabled={selectedIds.size === 0}
-                                    className={`text-[10px] text-blue-400 hover:text-blue-300 px-2 py-1 rounded hover:bg-blue-500/20 disabled:opacity-30 disabled:cursor-not-allowed ${
-                                        isHorizontal ? 'w-full' : 'flex-1'
-                                    }`}
-                                >
-                                    下載
-                                </button>
-                                <button
-                                    onClick={onUploadSelected}
-                                    disabled={selectedIds.size === 0}
-                                    className={`text-[10px] text-green-400 hover:text-green-300 px-2 py-1 rounded hover:bg-green-500/20 disabled:opacity-30 disabled:cursor-not-allowed ${
-                                        isHorizontal ? 'w-full' : 'flex-1'
-                                    }`}
-                                >
-                                    上傳
-                                </button>
                             </div>
                         </div>
                     ) : isReorderMode ? (

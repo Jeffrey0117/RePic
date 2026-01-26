@@ -697,6 +697,50 @@ function App() {
     }
   }, [selectedAlbum]);
 
+  // Move selected images up
+  const handleMoveUp = useCallback(() => {
+    if (!selectedAlbum || selectedImageIds.size === 0) return;
+
+    const images = [...selectedAlbum.images];
+    const selectedIndices = images
+      .map((img, idx) => selectedImageIds.has(img.id) ? idx : -1)
+      .filter(idx => idx !== -1)
+      .sort((a, b) => a - b);
+
+    // Can't move up if first selected is already at top
+    if (selectedIndices[0] === 0) return;
+
+    // Move each selected item up by 1
+    for (const idx of selectedIndices) {
+      [images[idx - 1], images[idx]] = [images[idx], images[idx - 1]];
+    }
+
+    // Update album
+    updateAlbum(selectedAlbum.id, { images });
+  }, [selectedAlbum, selectedImageIds, updateAlbum]);
+
+  // Move selected images down
+  const handleMoveDown = useCallback(() => {
+    if (!selectedAlbum || selectedImageIds.size === 0) return;
+
+    const images = [...selectedAlbum.images];
+    const selectedIndices = images
+      .map((img, idx) => selectedImageIds.has(img.id) ? idx : -1)
+      .filter(idx => idx !== -1)
+      .sort((a, b) => b - a); // Reverse order for moving down
+
+    // Can't move down if last selected is already at bottom
+    if (selectedIndices[0] === images.length - 1) return;
+
+    // Move each selected item down by 1
+    for (const idx of selectedIndices) {
+      [images[idx], images[idx + 1]] = [images[idx + 1], images[idx]];
+    }
+
+    // Update album
+    updateAlbum(selectedAlbum.id, { images });
+  }, [selectedAlbum, selectedImageIds, updateAlbum]);
+
   // Batch download selected images (uses Go for speed)
   const handleBatchDownload = useCallback(async () => {
     if (selectedImageIds.size === 0 || !selectedAlbum) return;
@@ -1483,6 +1527,8 @@ function App() {
                 onDownloadSelected={handleBatchDownload}
                 onUploadSelected={handleBatchUpload}
                 onSelectAll={handleSelectAll}
+                onMoveUp={handleMoveUp}
+                onMoveDown={handleMoveDown}
                 onReorder={viewMode === 'album' ? (from, to) => reorderImages(selectedAlbumId, from, to) : undefined}
                 onContextMenu={viewMode === 'album' ? (e, image) => handleImageContextMenu(e, image, selectedAlbum) : undefined}
                 position={sidebarPosition}
