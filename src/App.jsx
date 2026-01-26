@@ -1362,7 +1362,19 @@ function App() {
             onSelectAlbum={selectAlbum}
             onCreateAlbum={createAlbum}
             onRenameAlbum={renameAlbum}
-            onDeleteAlbum={deleteAlbum}
+            onDeleteAlbum={async (albumId) => {
+              const album = albums.find(a => a.id === albumId);
+              if (!album) return;
+              const confirmed = await confirm(t('deleteAlbumConfirm'), {
+                title: t('confirmDelete'),
+                confirmText: t('delete'),
+                cancelText: t('cancel'),
+                danger: true
+              });
+              if (confirmed) {
+                deleteAlbum(albumId);
+              }
+            }}
             onExportAlbums={exportAlbums}
             onImportAlbums={(json) => {
               const result = importAlbums(json);
