@@ -209,26 +209,37 @@ export const Sidebar = ({
       return () => observer.disconnect();
     }, [isHorizontal]);
 
+    // Track previous files to detect album change
+    const prevFilesRef = useRef(files);
+
     // Scroll to current item when it changes or files change
     useEffect(() => {
         const container = scrollContainerRef.current;
         if (!container || currentIndex < 0 || files.length === 0) return;
 
+        // Detect if album changed (files array is different)
+        const albumChanged = prevFilesRef.current !== files;
+        prevFilesRef.current = files;
+
         // Small delay to ensure DOM has updated with new items
         const timeoutId = setTimeout(() => {
             const scrollPos = currentIndex * ITEM_SIZE;
 
+            // Album change: instant scroll (no animation)
+            // Same album navigation: smooth scroll
+            const behavior = albumChanged ? 'instant' : 'smooth';
+
             if (isHorizontal) {
                 const targetScroll = scrollPos - container.clientWidth / 2 + ITEM_SIZE / 2;
-                container.scrollTo({ left: Math.max(0, targetScroll), behavior: 'smooth' });
+                container.scrollTo({ left: Math.max(0, targetScroll), behavior });
             } else {
                 const targetScroll = scrollPos - container.clientHeight / 2 + ITEM_SIZE / 2;
-                container.scrollTo({ top: Math.max(0, targetScroll), behavior: 'smooth' });
+                container.scrollTo({ top: Math.max(0, targetScroll), behavior });
             }
-        }, 50);
+        }, albumChanged ? 0 : 50); // No delay for album change
 
         return () => clearTimeout(timeoutId);
-    }, [currentIndex, ITEM_SIZE, isHorizontal, files.length]);
+    }, [currentIndex, ITEM_SIZE, isHorizontal, files]);
 
     const handleResizeMouseDown = useCallback((e) => {
         e.preventDefault();
