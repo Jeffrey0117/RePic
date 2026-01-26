@@ -384,44 +384,52 @@ export const Sidebar = ({
             {mode === 'web' && (
                 <div className={`flex-shrink-0 ${isHorizontal ? 'border-r py-2 px-1 flex flex-col justify-center' : 'border-b px-2 py-2'} border-white/5`}>
                     {isMultiSelectMode ? (
-                        <div className={`flex ${isHorizontal ? 'flex-col items-center gap-2' : 'flex-col gap-1'}`}>
+                        <div className={`flex ${isHorizontal ? 'flex-col items-center gap-2' : 'flex-col gap-1.5'}`}>
+                            {/* Row 1: Count + Close */}
                             <div className={`flex items-center ${isHorizontal ? 'flex-col gap-1' : 'justify-between w-full'}`}>
                                 <span className="text-[10px] text-white/60">
-                                    {selectedIds.size}/{files.length}
+                                    已選 {selectedIds.size}/{files.length}
                                 </span>
-                                <div className="flex items-center gap-1">
-                                    {onSelectAll && (
-                                        <button
-                                            onClick={() => onSelectAll(selectedIds.size === files.length)}
-                                            className="text-[10px] text-primary hover:text-primary/80 px-2 py-0.5 rounded hover:bg-primary/10"
-                                        >
-                                            {selectedIds.size === files.length ? '取消' : '全選'}
-                                        </button>
-                                    )}
-                                    <button
-                                        onClick={onExitMultiSelect}
-                                        className="text-[10px] text-white/60 hover:text-white px-1.5 py-0.5 rounded hover:bg-white/10"
-                                    >
-                                        ✕
-                                    </button>
-                                </div>
+                                <button
+                                    onClick={onExitMultiSelect}
+                                    className="text-[10px] text-white/60 hover:text-white px-1.5 py-0.5 rounded hover:bg-white/10"
+                                >
+                                    ✕
+                                </button>
                             </div>
-                            <div className={`flex ${isHorizontal ? 'flex-col' : 'flex-row'} items-center gap-1`}>
+                            {/* Row 2: Actions */}
+                            <div className={`flex ${isHorizontal ? 'flex-col' : 'flex-row'} items-center gap-1 w-full`}>
+                                {onSelectAll && (
+                                    <button
+                                        onClick={() => onSelectAll(selectedIds.size === files.length)}
+                                        className={`text-[10px] px-2 py-1 rounded transition-colors ${
+                                            isHorizontal ? 'w-full' : 'flex-1'
+                                        } ${
+                                            selectedIds.size === files.length
+                                                ? 'text-white/60 hover:text-white hover:bg-white/10'
+                                                : 'text-primary hover:bg-primary/10'
+                                        }`}
+                                    >
+                                        {selectedIds.size === files.length ? '取消' : '全選'}
+                                    </button>
+                                )}
                                 <button
                                     onClick={onDownloadSelected}
                                     disabled={selectedIds.size === 0}
-                                    className="text-[10px] text-blue-400 hover:text-blue-300 px-2 py-1 rounded hover:bg-blue-500/20 disabled:opacity-30 disabled:cursor-not-allowed"
-                                    title="下載"
+                                    className={`text-[10px] text-blue-400 hover:text-blue-300 px-2 py-1 rounded hover:bg-blue-500/20 disabled:opacity-30 disabled:cursor-not-allowed ${
+                                        isHorizontal ? 'w-full' : 'flex-1'
+                                    }`}
                                 >
-                                    ↓
+                                    下載
                                 </button>
                                 <button
                                     onClick={onUploadSelected}
                                     disabled={selectedIds.size === 0}
-                                    className="text-[10px] text-green-400 hover:text-green-300 px-2 py-1 rounded hover:bg-green-500/20 disabled:opacity-30 disabled:cursor-not-allowed"
-                                    title="上傳"
+                                    className={`text-[10px] text-green-400 hover:text-green-300 px-2 py-1 rounded hover:bg-green-500/20 disabled:opacity-30 disabled:cursor-not-allowed ${
+                                        isHorizontal ? 'w-full' : 'flex-1'
+                                    }`}
                                 >
-                                    ↑
+                                    上傳
                                 </button>
                             </div>
                         </div>
