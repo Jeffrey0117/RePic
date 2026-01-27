@@ -1560,6 +1560,15 @@ function App() {
           localStorage.setItem('repic-sidebar-position', newPos);
         }}
         onAbout={() => setShowAboutDialog(true)}
+        // Grid/Image view toggle
+        currentViewMode={viewMode === 'album' ? albumViewMode : localViewMode}
+        onToggleViewLayout={() => {
+          if (viewMode === 'album') {
+            setAlbumViewMode(prev => prev === 'grid' ? 'image' : 'grid');
+          } else {
+            setLocalViewMode(prev => prev === 'grid' ? 'image' : 'grid');
+          }
+        }}
         // Toolbar props
         onRefresh={handleRefresh}
         onToggleEdit={() => setIsEditing(!isEditing)}
@@ -1832,7 +1841,11 @@ function App() {
                   className="absolute inset-0 z-10 bg-[#0A0A0A]"
                 >
                   <ThumbnailGrid
-                    images={files.map((file, idx) => ({ id: idx, url: file, src: file, name: getElectronAPI()?.path?.basename(file) }))}
+                    images={files.map((file, idx) => {
+                      const electronAPI = getElectronAPI();
+                      const name = electronAPI?.path?.basename(file) || file.split(/[\\/]/).pop() || `Image ${idx + 1}`;
+                      return { id: idx, url: file, src: file, name };
+                    })}
                     currentIndex={currentIndex}
                     onSelectImage={(index) => {
                       selectImage(index);
