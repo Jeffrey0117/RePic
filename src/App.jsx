@@ -20,7 +20,7 @@ import { useFileSystem } from './hooks/useFileSystem';
 import { useWebAlbums } from './hooks/useWebAlbums';
 import { useConfirmDialog } from './hooks/useConfirmDialog';
 import useI18n from './hooks/useI18n';
-import { loadImage, PRIORITY_HIGH } from './utils/imageLoader';
+import { loadImage, PRIORITY_HIGH, clearMemoryCache } from './utils/imageLoader';
 import { prefetchWindow, clearPrefetch } from './utils/prefetchManager';
 
 // Lazy load heavy components
@@ -261,10 +261,47 @@ function App() {
 
   // Refresh current view without changing folder
   const handleRefresh = useCallback(() => {
-    if (viewMode === 'local' && currentPath) {
-      loadFolder(currentPath, true);
+    if (viewMode === 'album') {
+      // Album mode
+      if (albumViewMode === 'grid') {
+        // Grid view: clear all image caches and show toast
+        clearMemoryCache();
+        setCacheVersion(prev => prev + 1); // Force re-render thumbnails
+        setToast({ visible: true, message: t('refreshed') || '已重整' });
+      } else if (albumViewMode === 'image' && currentAlbumImage) {
+        // Image view: clear cache for current image and reload
+        const url = currentAlbumImage.url || currentAlbumImage.src || currentAlbumImage;
+        if (url.startsWith('http')) {
+          // Clear from memory cache by deleting and re-requesting
+          clearMemoryCache();
+          // Force reload by clearing prefetch and triggering re-render
+          clearPrefetch();
+          setCacheVersion(prev => prev + 1);
+          setToast({ visible: true, message: t('imageReloaded') || '圖片已重新載入' });
+        }
+      }
+    } else if (viewMode === 'local') {
+      // Local mode
+      if (localViewMode === 'grid' && currentPath) {
+        // Grid view: reload folder
+        loadFolder(currentPath, true);
+        setToast({ visible: true, message: t('refreshed') || '已重整' });
+      } else if (localViewMode === 'image' && currentImage) {
+        // Image view: clear cache and reload current image
+        if (currentImage.startsWith('http')) {
+          clearMemoryCache();
+          clearPrefetch();
+        }
+        // Force reload by bumping cache version
+        setCacheVersion(prev => prev + 1);
+        setLocalImage(null); // Clear local image to force reload
+        setTimeout(() => {
+          setLocalImage(`file://${currentImage}?t=${Date.now()}`);
+          setToast({ visible: true, message: t('imageReloaded') || '圖片已重新載入' });
+        }, 50);
+      }
     }
-  }, [viewMode, currentPath, loadFolder]);
+  }, [viewMode, albumViewMode, localViewMode, currentPath, currentImage, currentAlbumImage, loadFolder, t]);
 
   // Track internal drag start (from sidebar thumbnails or image viewer)
   useEffect(() => {

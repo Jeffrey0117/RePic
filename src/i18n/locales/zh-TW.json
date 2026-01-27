@@ -153,5 +153,7 @@
   "rename": "重新命名",
   "scrapeConfirmTitle": "抓取網頁圖片",
   "scrapeConfirmMessage": "將抓取此網頁的所有圖片",
-  "scrapeImages": "抓取"
+  "scrapeImages": "抓取",
+  "refreshed": "已重整",
+  "imageReloaded": "圖片已重新載入"
 }

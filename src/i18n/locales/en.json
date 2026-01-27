@@ -153,5 +153,7 @@
   "rename": "Rename",
   "scrapeConfirmTitle": "Scrape Images",
   "scrapeConfirmMessage": "Will scrape all images from this page",
-  "scrapeImages": "Scrape"
+  "scrapeImages": "Scrape",
+  "refreshed": "Refreshed",
+  "imageReloaded": "Image reloaded"
 }
