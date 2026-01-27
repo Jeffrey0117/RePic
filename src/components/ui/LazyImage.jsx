@@ -65,6 +65,82 @@ export const LazyImage = memo(({
         if (!isVisible || !src) return;
         if (loadedSrc) return; // Already loaded
 
+        // Check if it's a .repic virtual image file
+        if (src.toLowerCase().endsWith('.repic')) {
+            if (electronAPI?.readRepicFile) {
+                (async () => {
+                    try {
+                        const result = await electronAPI.readRepicFile(src);
+                        if (result.success && result.data?.url) {
+                            // Replace src with the URL from .repic file
+                            // This will trigger a new load cycle with the actual URL
+                            setLoadedSrc(null);
+                            setIsLoading(true);
+                            // Directly load the URL from .repic file
+                            const actualSrc = result.data.url;
+
+                            // Load the actual URL using the same strategy
+                            const priority = isHighPriority ? PRIORITY_HIGH : PRIORITY_NORMAL;
+                            const loader = useThumbnail ? loadThumbnail(actualSrc) : loadImage(actualSrc, priority);
+
+                            loader
+                                .then((data) => {
+                                    if (data) {
+                                        setLoadedSrc(data);
+                                        setIsLoading(false);
+                                        onLoad?.();
+                                    }
+                                })
+                                .catch(async (err) => {
+                                    // Try fallback proxies for web images
+                                    if (electronAPI?.proxyImage) {
+                                        try {
+                                            const proxyResult = await electronAPI.proxyImage(actualSrc);
+                                            if (proxyResult.success) {
+                                                cacheProxyResult(actualSrc, proxyResult.data);
+                                                setLoadedSrc(proxyResult.data);
+                                                setIsLoading(false);
+                                                onLoad?.();
+                                                return;
+                                            }
+                                        } catch (e) {}
+                                    }
+
+                                    // Try browser proxy as last resort
+                                    if (electronAPI?.proxyImageBrowser) {
+                                        try {
+                                            const browserResult = await electronAPI.proxyImageBrowser(actualSrc);
+                                            if (browserResult.success) {
+                                                cacheProxyResult(actualSrc, browserResult.data);
+                                                setLoadedSrc(browserResult.data);
+                                                setIsLoading(false);
+                                                onLoad?.();
+                                                return;
+                                            }
+                                        } catch (e) {}
+                                    }
+
+                                    setHasError(true);
+                                    setIsLoading(false);
+                                    onError?.(err);
+                                });
+                        } else {
+                            setHasError(true);
+                            setIsLoading(false);
+                        }
+                    } catch (err) {
+                        setHasError(true);
+                        setIsLoading(false);
+                        onError?.(err);
+                    }
+                })();
+            } else {
+                setHasError(true);
+                setIsLoading(false);
+            }
+            return;
+        }
+
         // Check if it's a local file (no need for imageLoader)
         if (src.startsWith('file://') || src.startsWith('data:')) {
             setLoadedSrc(src);
@@ -186,8 +262,8 @@ export const LazyImage = memo(({
             setLoadedSrc(cached);
             setIsLoading(false);
             setHasError(false);
-        } else if (src?.startsWith('http')) {
-            // Only reset if it's a web image that needs loading
+        } else if (src?.startsWith('http') || src?.toLowerCase().endsWith('.repic')) {
+            // Reset if it's a web image or .repic file that needs loading
             setLoadedSrc(null);
             setIsLoading(true);
             setHasError(false);
