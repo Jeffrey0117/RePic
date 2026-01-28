@@ -395,9 +395,7 @@ export const ImageViewer = ({ src, crop, annotations = [] }) => {
                                     backgroundSize: '24px 24px',
                                     backgroundPosition: '0 0, 0 12px, 12px -12px, -12px 0px',
                                     backgroundColor: '#FFFFFF'
-                                } : {
-                                    backgroundColor: '#000000'
-                                })
+                                } : {})
                             }}
                         >
                             <img

@@ -688,9 +688,7 @@ export const Sidebar = ({
                                                     backgroundSize: '16px 16px',
                                                     backgroundPosition: '0 0, 0 8px, 8px -8px, -8px 0px',
                                                     backgroundColor: '#FFFFFF'
-                                                } : {
-                                                    backgroundColor: '#000000' // Black for JPG/JPEG
-                                                }}
+                                                } : {}}
                                             >
                                                 <img
                                                     src={imgSrc}

@@ -308,9 +308,7 @@ export const LazyImage = memo(({
                     backgroundSize: '16px 16px',
                     backgroundPosition: '0 0, 0 8px, 8px -8px, -8px 0px',
                     backgroundColor: '#FFFFFF'
-                } : {
-                    backgroundColor: '#000000' // Black background for non-transparent images
-                })
+                } : {})
             }}
         >
             {/* Loading state: spinner for full images, subtle bg for thumbnails */}
