@@ -3,6 +3,7 @@ import useI18n from '../../hooks/useI18n';
 import { getCached, loadImage, PRIORITY_HIGH } from '../../utils/imageLoader';
 import { getLocalUrl, onPrefetchComplete } from '../../utils/prefetchManager';
 import { drawAnnotation } from '../editor/utils/drawingHelpers';
+import { hasImageTransparency, isPNGFormat } from '../../utils/imageUtils';
 
 const electronAPI = window.electronAPI || null;
 
@@ -54,6 +55,7 @@ export const ImageViewer = ({ src, crop, annotations = [] }) => {
     const [proxiedSrc, setProxiedSrc] = useState(null);
     const [loadFailed, setLoadFailed] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [detectedTransparency, setDetectedTransparency] = useState(false);
 
     // Reset state when src changes
     useEffect(() => {
@@ -225,6 +227,20 @@ export const ImageViewer = ({ src, crop, annotations = [] }) => {
     // Actual image source (cached > proxied > original)
     const imageSrc = proxiedSrc || src;
 
+    // Detect transparency when image loads
+    useEffect(() => {
+        if (!imageSrc || loadFailed) return;
+
+        // Only detect for PNG format images to save performance
+        if (isPNGFormat(imageSrc)) {
+            hasImageTransparency(imageSrc).then((hasAlpha) => {
+                setDetectedTransparency(hasAlpha);
+            });
+        } else {
+            setDetectedTransparency(false);
+        }
+    }, [imageSrc, loadFailed]);
+
     // Handle scroll wheel zoom - zoom toward mouse position
     const handleWheel = useCallback((e) => {
         e.preventDefault();
@@ -371,12 +387,8 @@ export const ImageViewer = ({ src, crop, annotations = [] }) => {
                 </div>
             ) : (
                 (() => {
-                    // Check if image is PNG or has transparency
-                    const isPNG = imageSrc && (
-                        imageSrc.toLowerCase().includes('.png') ||
-                        imageSrc.toLowerCase().includes('image/png') ||
-                        imageSrc.toLowerCase().includes('data:image/png')
-                    );
+                    // Show checkerboard if: 1) detected transparency, or 2) PNG format (optimistic)
+                    const shouldShowCheckerboard = detectedTransparency || isPNGFormat(imageSrc);
 
                     return (
                         <div
@@ -384,8 +396,8 @@ export const ImageViewer = ({ src, crop, annotations = [] }) => {
                             style={{
                                 transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
                                 transition: isDragging ? 'none' : 'transform 0.15s ease-out',
-                                // Only show checkerboard for PNG images
-                                ...(isPNG ? {
+                                // Show checkerboard for images with transparency
+                                ...(shouldShowCheckerboard ? {
                                     backgroundImage: `
                                         linear-gradient(45deg, #CCCCCC 25%, transparent 25%),
                                         linear-gradient(-45deg, #CCCCCC 25%, transparent 25%),

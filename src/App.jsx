@@ -12,7 +12,7 @@ import { ExportVirtualDialog } from './components/ui/ExportVirtualDialog';
 import { ConfirmDialog } from './components/ui/ConfirmDialog';
 import { AboutDialog } from './components/ui/AboutDialog';
 import { ContextMenu } from './components/ui/ContextMenu';
-import { Copy, Download, FolderOutput, Trash2, Pencil } from './components/icons';
+import { Copy, Download, FolderOutput, Trash2, Pencil, Grid3x3 } from './components/icons';
 import { prepareSingleExport } from './utils/repicFile';
 import { AlbumSidebar } from './features/album/AlbumSidebar';
 import { ThumbnailGrid } from './components/album/ThumbnailGrid';
@@ -99,6 +99,11 @@ function App() {
   // Album view mode: 'grid' for thumbnail grid, 'image' for single image viewer
   const [albumViewMode, setAlbumViewMode] = useState(() => {
     return localStorage.getItem('repic-album-view-mode') || 'grid';
+  });
+
+  // Grid size preference
+  const [gridSize, setGridSize] = useState(() => {
+    return localStorage.getItem('repic-grid-size') || 'medium';
   });
 
   // Local view mode: 'grid' or 'image'
@@ -1175,6 +1180,11 @@ function App() {
     localStorage.setItem('repic-local-view-mode', localViewMode);
   }, [localViewMode]);
 
+  // Persist grid size to localStorage
+  useEffect(() => {
+    localStorage.setItem('repic-grid-size', gridSize);
+  }, [gridSize]);
+
   // Prefetch images around current index (sliding window via Go)
   useEffect(() => {
     if (viewMode !== 'album' || !selectedAlbum?.images?.length) return;
@@ -1211,6 +1221,16 @@ function App() {
       img.src = url;
     });
   }, [viewMode, safeAlbumIndex, albumImages]);
+
+  // Toggle grid size
+  const toggleGridSize = () => {
+    setGridSize(currentSize => {
+      const sizes = ['small', 'medium', 'large'];
+      const currentIndex = sizes.indexOf(currentSize);
+      const nextIndex = (currentIndex + 1) % sizes.length;
+      return sizes[nextIndex];
+    });
+  };
 
   // Copy image to clipboard
   const handleCopy = async () => {
@@ -1845,7 +1865,7 @@ function App() {
                       setAlbumImageIndex(index);
                       setAlbumViewMode('image');
                     }}
-                    size="medium"
+                    size={gridSize}
                     isMultiSelectMode={isMultiSelectMode}
                     selectedImageIds={selectedImageIds}
                     processingImageIds={processingImageIds}
@@ -1862,6 +1882,15 @@ function App() {
                     }}
                     onRemoveBackground={handleRemoveBackground}
                   />
+                  {/* Grid size toggle button */}
+                  <button
+                    onClick={toggleGridSize}
+                    className="absolute top-4 right-4 bg-white/10 hover:bg-white/20 text-white p-3 rounded-lg transition-colors backdrop-blur-sm flex items-center gap-2"
+                    title={`Grid size: ${gridSize}`}
+                  >
+                    <Grid3x3 size={20} />
+                    <span className="text-xs font-medium uppercase">{gridSize}</span>
+                  </button>
                 </motion.div>
               ) : albumViewMode === 'image' && currentAlbumImage ? (
                 // Image view - single image viewer
@@ -1969,8 +1998,17 @@ function App() {
                       selectImage(index);
                       setLocalViewMode('image');
                     }}
-                    size="medium"
+                    size={gridSize}
                   />
+                  {/* Grid size toggle button */}
+                  <button
+                    onClick={toggleGridSize}
+                    className="absolute top-4 right-4 bg-white/10 hover:bg-white/20 text-white p-3 rounded-lg transition-colors backdrop-blur-sm flex items-center gap-2"
+                    title={`Grid size: ${gridSize}`}
+                  >
+                    <Grid3x3 size={20} />
+                    <span className="text-xs font-medium uppercase">{gridSize}</span>
+                  </button>
                 </motion.div>
               ) : localViewMode === 'image' && localImage && !isEditing ? (
                 // Image view

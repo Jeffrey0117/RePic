@@ -25,3 +25,4 @@ export { Upload } from './Upload';
 export { Copy } from './Copy';
 export { Album } from './Album';
 export { Pencil } from './Pencil';
+export { Grid3x3 } from './Grid3x3';
