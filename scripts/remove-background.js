@@ -23,16 +23,25 @@ async function removeBackground(inputPath, outputPath) {
       .toBuffer({ resolveWithObject: true });
 
     // Process pixels to remove light gray/white background
-    // Threshold for determining background (adjust if needed)
-    const threshold = 240; // Pixels with R,G,B all > 240 are considered background
+    // Using color distance algorithm for better gray detection
 
     for (let i = 0; i < data.length; i += 4) {
       const r = data[i];
       const g = data[i + 1];
       const b = data[i + 2];
 
-      // If pixel is very light (close to white/light gray), make it transparent
-      if (r > threshold && g > threshold && b > threshold) {
+      // Check if pixel is light (brightness > 200)
+      const brightness = (r + g + b) / 3;
+
+      // Check if pixel is grayscale (low color variation)
+      const maxChannel = Math.max(r, g, b);
+      const minChannel = Math.min(r, g, b);
+      const saturation = maxChannel - minChannel;
+
+      // Remove if: bright AND low saturation (gray/white)
+      // Brightness threshold: 200 (catches lighter grays)
+      // Saturation threshold: 30 (allows slightly colored pixels to pass)
+      if (brightness > 200 && saturation < 30) {
         data[i + 3] = 0; // Set alpha to 0 (transparent)
       }
     }
