@@ -264,16 +264,16 @@ export const ImageEditor = ({
             className="shadow-2xl"
             disabled={activeTab !== TABS.CROP}
             style={{
-              // Checkerboard pattern for transparency
+              // Checkerboard pattern for transparency (white + light gray)
               backgroundImage: `
-                linear-gradient(45deg, #808080 25%, transparent 25%),
-                linear-gradient(-45deg, #808080 25%, transparent 25%),
-                linear-gradient(45deg, transparent 75%, #808080 75%),
-                linear-gradient(-45deg, transparent 75%, #808080 75%)
+                linear-gradient(45deg, #CCCCCC 25%, transparent 25%),
+                linear-gradient(-45deg, #CCCCCC 25%, transparent 25%),
+                linear-gradient(45deg, transparent 75%, #CCCCCC 75%),
+                linear-gradient(-45deg, transparent 75%, #CCCCCC 75%)
               `,
               backgroundSize: '20px 20px',
               backgroundPosition: '0 0, 0 10px, 10px -10px, -10px 0px',
-              backgroundColor: '#404040'
+              backgroundColor: '#FFFFFF'
             }}
           >
             <img
