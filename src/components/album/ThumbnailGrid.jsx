@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { LazyImage } from '../ui/LazyImage';
 import { ContextMenu } from '../ui/ContextMenu';
-import { Scissors, Layers } from '../icons';
+import { Scissors, Layers, Pencil } from '../icons';
 
 /**
  * ThumbnailGrid - Grid view for album images
@@ -15,6 +15,7 @@ import { Scissors, Layers } from '../icons';
  * @param {Set} processingImageIds - IDs of images being processed
  * @param {Function} onToggleSelect - Toggle image selection
  * @param {Function} onRemoveBackground - Callback for removing background from image(s)
+ * @param {Function} onRenameImage - Callback for renaming image (imageId, newName)
  */
 export const ThumbnailGrid = ({
   images,
@@ -25,7 +26,8 @@ export const ThumbnailGrid = ({
   selectedImageIds = new Set(),
   processingImageIds = new Set(),
   onToggleSelect,
-  onRemoveBackground
+  onRemoveBackground,
+  onRenameImage
 }) => {
   // Grid sizes (in pixels)
   const sizes = {
@@ -42,6 +44,19 @@ export const ThumbnailGrid = ({
     targetImage: null,
     targetIndex: null
   });
+
+  // Rename state
+  const [renamingImageId, setRenamingImageId] = useState(null);
+  const [renameValue, setRenameValue] = useState('');
+  const renameInputRef = useRef(null);
+
+  // Focus and select rename input when renaming starts
+  useEffect(() => {
+    if (renamingImageId && renameInputRef.current) {
+      renameInputRef.current.focus();
+      renameInputRef.current.select();
+    }
+  }, [renamingImageId]);
 
   // Handle right-click on thumbnail
   const handleContextMenu = (e, image, index) => {
@@ -78,9 +93,52 @@ export const ThumbnailGrid = ({
     }
   };
 
+  // Handle rename from context menu
+  const handleStartRename = () => {
+    if (contextMenu.targetImage) {
+      const currentName = contextMenu.targetImage.name ||
+        `${contextMenu.targetIndex + 1}.jpg`;
+      setRenamingImageId(contextMenu.targetImage.id);
+      setRenameValue(currentName);
+      closeContextMenu();
+    }
+  };
+
+  // Handle rename submit
+  const handleRenameSubmit = () => {
+    if (renamingImageId && renameValue.trim() && onRenameImage) {
+      onRenameImage(renamingImageId, renameValue.trim());
+    }
+    setRenamingImageId(null);
+    setRenameValue('');
+  };
+
+  // Handle rename cancel
+  const handleRenameCancel = () => {
+    setRenamingImageId(null);
+    setRenameValue('');
+  };
+
+  // Handle double-click on image name
+  const handleNameDoubleClick = (e, image, index) => {
+    e.stopPropagation();
+    const currentName = image.name || `${index + 1}.jpg`;
+    setRenamingImageId(image.id);
+    setRenameValue(currentName);
+  };
+
   // Context menu items
   const getContextMenuItems = () => {
     const items = [];
+
+    // Rename option
+    if (onRenameImage && !isMultiSelectMode) {
+      items.push({
+        label: 'Rename',
+        icon: Pencil,
+        onClick: handleStartRename
+      });
+    }
 
     // Remove Background option
     if (onRemoveBackground) {
@@ -170,11 +228,36 @@ export const ThumbnailGrid = ({
                 </div>
               )}
 
-              {/* Image name overlay (on hover) */}
-              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                <p className="text-xs text-white/90 truncate">
-                  {image.name || `${index + 1}.jpg`}
-                </p>
+              {/* Image name overlay (on hover or when renaming) */}
+              <div className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2 transition-opacity duration-200 ${
+                renamingImageId === image.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+              }`}>
+                {renamingImageId === image.id ? (
+                  <input
+                    ref={renameInputRef}
+                    type="text"
+                    value={renameValue}
+                    onChange={(e) => setRenameValue(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleRenameSubmit();
+                      } else if (e.key === 'Escape') {
+                        handleRenameCancel();
+                      }
+                      e.stopPropagation();
+                    }}
+                    onBlur={handleRenameSubmit}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-full px-2 py-1 text-xs bg-white/10 text-white border border-white/20 rounded focus:outline-none focus:border-primary"
+                  />
+                ) : (
+                  <p
+                    className="text-xs text-white/90 truncate cursor-text"
+                    onDoubleClick={(e) => handleNameDoubleClick(e, image, index)}
+                  >
+                    {image.name || `${index + 1}.jpg`}
+                  </p>
+                )}
               </div>
 
               {/* Current indicator badge */}

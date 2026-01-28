@@ -151,6 +151,7 @@
   "scrapeFailed": "Scrape failed: {error}",
   "webpageNotSupported": "Webpage drop not supported (drop images instead)",
   "rename": "Rename",
+  "renamed": "Renamed successfully",
   "scrapeConfirmTitle": "Scrape Images",
   "scrapeConfirmMessage": "Will scrape all images from this page",
   "scrapeImages": "Scrape",

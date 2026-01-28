@@ -266,6 +266,22 @@ export const useWebAlbums = () => {
     ));
   }, []);
 
+  // Rename image
+  const renameImage = useCallback((albumId, imageId, newName) => {
+    setAlbums(prev => prev.map(album =>
+      album.id === albumId
+        ? {
+            ...album,
+            images: album.images.map(img =>
+              img.id === imageId
+                ? { ...img, name: newName.trim() }
+                : img
+            )
+          }
+        : album
+    ));
+  }, []);
+
   // Select album (immediate switch)
   const selectAlbum = useCallback((albumId) => {
     // Cancel pending image loads BEFORE switching (prevents old album blocking new)
@@ -366,6 +382,7 @@ export const useWebAlbums = () => {
     updateImageCrop,
     clearImageCrop,
     updateImageData,
+    renameImage,
     reorderImages,
     updateAlbumImages,
     exportAlbums,

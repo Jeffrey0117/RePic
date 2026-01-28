@@ -1499,6 +1499,27 @@ function setupIpcHandlers() {
     });
 
     // Batch crop - save cropped image data to file
+    // Rename file
+    ipcMain.handle('rename-file', async (event, { oldPath, newPath }) => {
+        try {
+            if (!oldPath || !newPath) {
+                return { success: false, error: 'Invalid paths' };
+            }
+
+            // Check if new file already exists
+            if (fs.existsSync(newPath)) {
+                return { success: false, error: 'A file with this name already exists' };
+            }
+
+            // Rename the file
+            fs.renameSync(oldPath, newPath);
+            return { success: true, newPath };
+        } catch (e) {
+            console.error('[rename-file] Error:', e);
+            return { success: false, error: e.message };
+        }
+    });
+
     ipcMain.handle('batch-crop-save', async (event, { filePath, base64Data, outputMode, originalPath, customDir }) => {
         console.log('[batch-crop-save] Received:', { filePath, outputMode, originalPath, customDir, hasBase64: !!base64Data });
 

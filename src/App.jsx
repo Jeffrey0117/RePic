@@ -61,6 +61,7 @@ function App() {
     removeImage: removeAlbumImage,
     updateImageCrop,
     updateImageData,
+    renameImage: renameAlbumImage,
     reorderImages,
     updateAlbumImages,
     exportAlbums,
@@ -982,6 +983,36 @@ function App() {
     setIsMultiSelectMode(false);
   }, [selectedImageIds, selectedAlbum, t]);
 
+  // Handle rename album image
+  const handleRenameAlbumImage = useCallback((imageId, newName) => {
+    if (!selectedAlbumId || !newName.trim()) return;
+    renameAlbumImage(selectedAlbumId, imageId, newName.trim());
+    setToast({ visible: true, message: t('renamed') || 'Renamed successfully' });
+  }, [selectedAlbumId, renameAlbumImage, t]);
+
+  // Handle rename local file
+  const handleRenameLocalFile = useCallback(async (fileId, newName) => {
+    const electronAPI = getElectronAPI();
+    if (!electronAPI || !currentPath) return;
+
+    const file = files[fileId];
+    if (!file) return;
+
+    const dirPath = electronAPI.path.dirname(file);
+    const oldExt = electronAPI.path.extname(file);
+    const newNameWithExt = newName.endsWith(oldExt) ? newName : `${newName}${oldExt}`;
+    const newPath = electronAPI.path.join(dirPath, newNameWithExt);
+
+    const result = await electronAPI.renameFile(file, newPath);
+    if (result.success) {
+      // Reload the folder to reflect changes
+      loadFolder(currentPath, true);
+      setToast({ visible: true, message: t('renamed') || 'Renamed successfully' });
+    } else {
+      setToast({ visible: true, message: result.error || 'Rename failed' });
+    }
+  }, [files, currentPath, loadFolder, t]);
+
   // Batch upload selected images to cloud
   const handleBatchUpload = useCallback(async () => {
     if (selectedImageIds.size === 0 || !selectedAlbum) return;
@@ -1538,10 +1569,45 @@ function App() {
               setToast({ visible: true, message: t('uploadFailed', { error: err.message }) });
             }
           } else {
-            // Local mode: set as current image (unsaved)
-            setLocalImage(base64);
-            setIsModified(true);
-            setToast({ visible: true, message: t('imageAdded') });
+            // Local mode: save to temp file and add to file list
+            const electronAPI = getElectronAPI();
+            if (electronAPI && currentPath) {
+              try {
+                // Generate temp filename
+                const timestamp = Date.now();
+                const tempFilename = `temp_paste_${timestamp}.png`;
+                const tempFilePath = electronAPI.path.join(currentPath, tempFilename);
+
+                // Save the pasted image to temp file
+                const result = await electronAPI.saveFile(tempFilePath, base64);
+
+                if (result.success) {
+                  // Refresh folder to pick up new file
+                  loadFolder(currentPath, true);
+
+                  // Find and select the newly added file
+                  setTimeout(() => {
+                    const newFiles = electronAPI.getFilesInDirectory(currentPath);
+                    const newFileIndex = newFiles.findIndex(f => f === tempFilePath);
+                    if (newFileIndex >= 0) {
+                      selectImage(newFileIndex);
+                    }
+                  }, 100);
+
+                  setToast({ visible: true, message: t('imageAdded') });
+                } else {
+                  throw new Error(result.error || 'Failed to save file');
+                }
+              } catch (err) {
+                console.error('[Paste] Failed to save temp file:', err);
+                setToast({ visible: true, message: t('saveFailed', { error: err.message }) });
+              }
+            } else {
+              // No current path - fallback to old behavior (set as unsaved image)
+              setLocalImage(base64);
+              setIsModified(true);
+              setToast({ visible: true, message: t('imageAdded') });
+            }
           }
         };
         reader.readAsDataURL(blob);
@@ -1605,7 +1671,7 @@ function App() {
 
     window.addEventListener('paste', handlePaste);
     return () => window.removeEventListener('paste', handlePaste);
-  }, [isEditing, viewMode, selectedAlbumId, addAlbumImage, addAlbumImages, selectedAlbum?.images?.length, t, looksLikeImageUrl, confirm]);
+  }, [isEditing, viewMode, selectedAlbumId, addAlbumImage, addAlbumImages, selectedAlbum?.images?.length, t, looksLikeImageUrl, confirm, currentPath, loadFolder, selectImage]);
 
   return (
     <div
@@ -1881,6 +1947,7 @@ function App() {
                       });
                     }}
                     onRemoveBackground={handleRemoveBackground}
+                    onRenameImage={handleRenameAlbumImage}
                   />
                   {/* Switch to image view button */}
                   <button
@@ -2002,6 +2069,7 @@ function App() {
                       setLocalViewMode('image');
                     }}
                     size={gridSize}
+                    onRenameImage={handleRenameLocalFile}
                   />
                   {/* Switch to image view button */}
                   <button

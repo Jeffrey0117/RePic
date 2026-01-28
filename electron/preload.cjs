@@ -352,5 +352,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
             return { success: false, error: 'Invalid image source' };
         }
         return await ipcRenderer.invoke('remove-background', { imageSrc });
+    },
+
+    // Rename file
+    renameFile: async (oldPath, newPath) => {
+        if (!isValidPath(oldPath) || !isValidPath(newPath)) {
+            return { success: false, error: 'Invalid path' };
+        }
+        return await ipcRenderer.invoke('rename-file', { oldPath, newPath });
     }
 });
