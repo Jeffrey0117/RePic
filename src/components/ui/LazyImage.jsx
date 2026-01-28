@@ -284,7 +284,23 @@ export const LazyImage = memo(({
     }
 
     return (
-        <div ref={imgRef} className={`relative ${className}`} style={style}>
+        <div
+            ref={imgRef}
+            className={`relative ${className}`}
+            style={{
+                ...style,
+                // Checkerboard pattern for transparency (white + light gray)
+                backgroundImage: `
+                    linear-gradient(45deg, #CCCCCC 25%, transparent 25%),
+                    linear-gradient(-45deg, #CCCCCC 25%, transparent 25%),
+                    linear-gradient(45deg, transparent 75%, #CCCCCC 75%),
+                    linear-gradient(-45deg, transparent 75%, #CCCCCC 75%)
+                `,
+                backgroundSize: '16px 16px',
+                backgroundPosition: '0 0, 0 8px, 8px -8px, -8px 0px',
+                backgroundColor: '#FFFFFF'
+            }}
+        >
             {/* Loading state: spinner for full images, subtle bg for thumbnails */}
             {isLoading && (
                 useThumbnail ? (
