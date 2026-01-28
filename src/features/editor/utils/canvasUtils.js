@@ -3,6 +3,7 @@ import { drawAnnotation } from './drawingHelpers.js';
 // Processes crop data from Cropper component
 // crop: { x, y, width, height } in pixels
 // quality: 1-100 for JPEG compression (default 95)
+// Preserves PNG transparency
 export default async function getCroppedImg(
     image,
     crop,
@@ -80,8 +81,20 @@ export default async function getCroppedImg(
     ctx.restore();
 
     return new Promise((resolve) => {
-        // Use quality parameter (convert 1-100 to 0-1)
-        const q = Math.max(0.1, Math.min(1, quality / 100));
-        resolve(canvas.toDataURL('image/jpeg', q));
+        // Detect image format from src
+        const isPNG = image.src && (
+            image.src.toLowerCase().includes('.png') ||
+            image.src.toLowerCase().includes('image/png') ||
+            image.src.toLowerCase().includes('data:image/png')
+        );
+
+        if (isPNG) {
+            // Preserve PNG transparency - no quality parameter
+            resolve(canvas.toDataURL('image/png'));
+        } else {
+            // Use JPEG with quality parameter (convert 1-100 to 0-1)
+            const q = Math.max(0.1, Math.min(1, quality / 100));
+            resolve(canvas.toDataURL('image/jpeg', q));
+        }
     });
 }

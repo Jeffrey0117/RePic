@@ -249,6 +249,18 @@ function App() {
     navigateVirtual(virtualIndex - 1);
   }, [navigateVirtual, virtualIndex]);
 
+  // Album navigation (memoized for performance) - Moved before handleRefresh
+  const albumImages = useMemo(() => selectedAlbum?.images || [], [selectedAlbum?.images]);
+  // Ensure index is within bounds (important when switching albums)
+  const safeAlbumIndex = useMemo(() =>
+    albumImages.length > 0 ? Math.min(albumImageIndex, albumImages.length - 1) : 0,
+    [albumImages.length, albumImageIndex]
+  );
+  const currentAlbumImage = useMemo(() =>
+    albumImages.length > 0 ? (albumImages[safeAlbumIndex]?.url || null) : null,
+    [albumImages, safeAlbumIndex]
+  );
+
   const handleOpenFile = async () => {
     const electronAPI = getElectronAPI();
     if (electronAPI) {
@@ -1055,19 +1067,6 @@ function App() {
     link.href = localImage;
     link.click();
   };
-
-  // Album navigation (memoized for performance)
-  const albumImages = useMemo(() => selectedAlbum?.images || [], [selectedAlbum?.images]);
-  // Ensure index is within bounds (important when switching albums)
-  const safeAlbumIndex = useMemo(() =>
-    albumImages.length > 0 ? Math.min(albumImageIndex, albumImages.length - 1) : 0,
-    [albumImages.length, albumImageIndex]
-  );
-  const currentAlbumImage = useMemo(() =>
-    albumImages.length > 0 ? (albumImages[safeAlbumIndex]?.url || null) : null,
-    [albumImages, safeAlbumIndex]
-  );
-
   const nextAlbumImage = useCallback(() => {
     if (albumImageIndex < albumImages.length - 1) {
       setAlbumImageIndex(albumImageIndex + 1);
