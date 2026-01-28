@@ -370,24 +370,37 @@ export const ImageViewer = ({ src, crop, annotations = [] }) => {
                     <span className="text-base font-medium">暫不支援此來源</span>
                 </div>
             ) : (
-                <div
-                    className="relative rounded-md"
-                    style={{
-                        transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
-                        transition: isDragging ? 'none' : 'transform 0.15s ease-out',
-                        // Checkerboard pattern for transparency (white + light gray)
-                        backgroundImage: `
-                            linear-gradient(45deg, #CCCCCC 25%, transparent 25%),
-                            linear-gradient(-45deg, #CCCCCC 25%, transparent 25%),
-                            linear-gradient(45deg, transparent 75%, #CCCCCC 75%),
-                            linear-gradient(-45deg, transparent 75%, #CCCCCC 75%)
-                        `,
-                        backgroundSize: '24px 24px',
-                        backgroundPosition: '0 0, 0 12px, 12px -12px, -12px 0px',
-                        backgroundColor: '#FFFFFF',
-                    }}
-                >
-                    <img
+                (() => {
+                    // Check if image is PNG or has transparency
+                    const isPNG = imageSrc && (
+                        imageSrc.toLowerCase().includes('.png') ||
+                        imageSrc.toLowerCase().includes('image/png') ||
+                        imageSrc.toLowerCase().includes('data:image/png')
+                    );
+
+                    return (
+                        <div
+                            className="relative rounded-md"
+                            style={{
+                                transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
+                                transition: isDragging ? 'none' : 'transform 0.15s ease-out',
+                                // Only show checkerboard for PNG images
+                                ...(isPNG ? {
+                                    backgroundImage: `
+                                        linear-gradient(45deg, #CCCCCC 25%, transparent 25%),
+                                        linear-gradient(-45deg, #CCCCCC 25%, transparent 25%),
+                                        linear-gradient(45deg, transparent 75%, #CCCCCC 75%),
+                                        linear-gradient(-45deg, transparent 75%, #CCCCCC 75%)
+                                    `,
+                                    backgroundSize: '24px 24px',
+                                    backgroundPosition: '0 0, 0 12px, 12px -12px, -12px 0px',
+                                    backgroundColor: '#FFFFFF'
+                                } : {
+                                    backgroundColor: '#000000'
+                                })
+                            }}
+                        >
+                            <img
                         ref={imageRef}
                         src={imageSrc}
                         alt="View"
@@ -433,7 +446,9 @@ export const ImageViewer = ({ src, crop, annotations = [] }) => {
                             }}
                         />
                     )}
-                </div>
+                        </div>
+                    );
+                })()
             )}
         </div>
     );

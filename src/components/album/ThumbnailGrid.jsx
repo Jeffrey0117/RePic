@@ -145,6 +145,7 @@ export const ThumbnailGrid = ({
                 className="w-full h-full"
                 useThumbnail
                 showSpinner={true}
+                hasTransparency={image.hasBackgroundRemoved || !!image.processedUrl}
               />
 
               {/* Multi-select checkbox */}

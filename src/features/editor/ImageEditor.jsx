@@ -331,18 +331,30 @@ export const ImageEditor = ({
             onChange={(_, percentCrop) => setCrop(percentCrop)}
             onComplete={(c) => setCompletedCrop(c)}
             disabled={activeTab !== TABS.CROP}
-            style={{
-              // Checkerboard pattern for transparency (white + light gray)
-              backgroundImage: `
-                linear-gradient(45deg, #CCCCCC 25%, transparent 25%),
-                linear-gradient(-45deg, #CCCCCC 25%, transparent 25%),
-                linear-gradient(45deg, transparent 75%, #CCCCCC 75%),
-                linear-gradient(-45deg, transparent 75%, #CCCCCC 75%)
-              `,
-              backgroundSize: '24px 24px',
-              backgroundPosition: '0 0, 0 12px, 12px -12px, -12px 0px',
-              backgroundColor: '#FFFFFF'
-            }}
+            style={(() => {
+              // Check if displaying a PNG or removed background image
+              const displaySrc = activeTab === TABS.REMOVE_BG && removedBgImage ? removedBgImage : imageSrc;
+              const isPNG = displaySrc && (
+                displaySrc.toLowerCase().includes('.png') ||
+                displaySrc.toLowerCase().includes('image/png') ||
+                displaySrc.toLowerCase().includes('data:image/png')
+              );
+
+              return isPNG || removedBgImage ? {
+                // Checkerboard for PNG or removed background
+                backgroundImage: `
+                  linear-gradient(45deg, #CCCCCC 25%, transparent 25%),
+                  linear-gradient(-45deg, #CCCCCC 25%, transparent 25%),
+                  linear-gradient(45deg, transparent 75%, #CCCCCC 75%),
+                  linear-gradient(-45deg, transparent 75%, #CCCCCC 75%)
+                `,
+                backgroundSize: '24px 24px',
+                backgroundPosition: '0 0, 0 12px, 12px -12px, -12px 0px',
+                backgroundColor: '#FFFFFF'
+              } : {
+                backgroundColor: '#000000'
+              };
+            })()}
           >
             <img
               ref={imgRef}

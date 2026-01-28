@@ -19,7 +19,8 @@ export const LazyImage = memo(({
     onLoad,
     onError,
     fallbackElement,
-    showSpinner = true
+    showSpinner = true,
+    hasTransparency = false // Only show checkerboard if image has transparency
 }) => {
     const imgRef = useRef(null);
 
@@ -283,22 +284,33 @@ export const LazyImage = memo(({
         );
     }
 
+    // Check if image is PNG (likely has transparency)
+    const isPNG = src && (
+        src.toLowerCase().includes('.png') ||
+        src.toLowerCase().includes('image/png') ||
+        src.toLowerCase().includes('data:image/png')
+    );
+
     return (
         <div
             ref={imgRef}
             className={`relative ${className}`}
             style={{
                 ...style,
-                // Checkerboard pattern for transparency (white + light gray)
-                backgroundImage: `
-                    linear-gradient(45deg, #CCCCCC 25%, transparent 25%),
-                    linear-gradient(-45deg, #CCCCCC 25%, transparent 25%),
-                    linear-gradient(45deg, transparent 75%, #CCCCCC 75%),
-                    linear-gradient(-45deg, transparent 75%, #CCCCCC 75%)
-                `,
-                backgroundSize: '16px 16px',
-                backgroundPosition: '0 0, 0 8px, 8px -8px, -8px 0px',
-                backgroundColor: '#FFFFFF'
+                // Only show checkerboard for PNG or images marked as having transparency
+                ...(hasTransparency || isPNG ? {
+                    backgroundImage: `
+                        linear-gradient(45deg, #CCCCCC 25%, transparent 25%),
+                        linear-gradient(-45deg, #CCCCCC 25%, transparent 25%),
+                        linear-gradient(45deg, transparent 75%, #CCCCCC 75%),
+                        linear-gradient(-45deg, transparent 75%, #CCCCCC 75%)
+                    `,
+                    backgroundSize: '16px 16px',
+                    backgroundPosition: '0 0, 0 8px, 8px -8px, -8px 0px',
+                    backgroundColor: '#FFFFFF'
+                } : {
+                    backgroundColor: '#000000' // Black background for non-transparent images
+                })
             }}
         >
             {/* Loading state: spinner for full images, subtle bg for thumbnails */}
