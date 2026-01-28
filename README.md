@@ -1,5 +1,7 @@
 <div align="center">
-  <img src="repic.png" alt="Repic Logo" width="400">
+  <img src="repic-logo.png" alt="Repic Logo" width="120">
+  <br>
+  <img src="repic.png" alt="Repic" width="400">
 
   <p><strong>A powerful, minimalist Image Viewer & Manager with virtual image support.</strong></p>
   <p>Built with <strong>Electron</strong>, <strong>React</strong>, and <strong>TailwindCSS</strong>.</p>
