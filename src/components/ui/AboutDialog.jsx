@@ -48,18 +48,8 @@ export const AboutDialog = memo(({ isOpen, onClose }) => {
             onClick={(e) => e.stopPropagation()}
           >
             {/* App Icon */}
-            <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-primary/30 to-primary/10 flex items-center justify-center border border-primary/20">
-              <svg
-                viewBox="0 0 24 24"
-                className="w-10 h-10 text-primary"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-              >
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <circle cx="8.5" cy="8.5" r="1.5" fill="currentColor" />
-                <path d="M21 15l-5-5L5 21" />
-              </svg>
+            <div className="w-24 h-24 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-blue-50 to-gray-50 flex items-center justify-center p-2">
+              <img src="/logo.png" alt="Repic Logo" className="w-full h-full object-contain" />
             </div>
 
             {/* App Name */}

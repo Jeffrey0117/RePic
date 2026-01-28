@@ -1,7 +1,9 @@
-# Repic
+<div align="center">
+  <img src="repic.png" alt="Repic Logo" width="400">
 
-A powerful, minimalist Image Viewer & Manager with virtual image support.
-Built with **Electron**, **React**, and **TailwindCSS**.
+  <p><strong>A powerful, minimalist Image Viewer & Manager with virtual image support.</strong></p>
+  <p>Built with <strong>Electron</strong>, <strong>React</strong>, and <strong>TailwindCSS</strong>.</p>
+</div>
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 
