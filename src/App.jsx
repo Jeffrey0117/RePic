@@ -1903,7 +1903,7 @@ function App() {
 
         {/* Center: Main Viewport */}
         <main
-          className="flex-1 min-w-0 min-h-0 relative main-viewport-bg overflow-hidden transition-all duration-300"
+          className="flex-1 min-w-0 min-h-0 relative main-viewport-bg overflow-hidden"
         >
           <AnimatePresence>
             {viewMode === 'virtual' ? (

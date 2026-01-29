@@ -214,6 +214,8 @@ export const Sidebar = ({
 
     // Track previous files to detect album change
     const prevFilesRef = useRef(files);
+    // Track initial mount to skip smooth scroll on first render (e.g. position switch remount)
+    const isInitialMount = useRef(true);
 
     // Scroll to current item when it changes or files change
     useEffect(() => {
@@ -224,13 +226,17 @@ export const Sidebar = ({
         const albumChanged = prevFilesRef.current !== files;
         prevFilesRef.current = files;
 
+        // Initial mount or album change: instant scroll (no animation)
+        // Same album navigation after mount: smooth scroll
+        const shouldInstant = isInitialMount.current || albumChanged;
+        if (isInitialMount.current) {
+            isInitialMount.current = false;
+        }
+
         // Small delay to ensure DOM has updated with new items
         const timeoutId = setTimeout(() => {
             const scrollPos = currentIndex * ITEM_SIZE;
-
-            // Album change: instant scroll (no animation)
-            // Same album navigation: smooth scroll
-            const behavior = albumChanged ? 'instant' : 'smooth';
+            const behavior = shouldInstant ? 'instant' : 'smooth';
 
             if (isHorizontal) {
                 const targetScroll = scrollPos - container.clientWidth / 2 + ITEM_SIZE / 2;
@@ -239,7 +245,7 @@ export const Sidebar = ({
                 const targetScroll = scrollPos - container.clientHeight / 2 + ITEM_SIZE / 2;
                 container.scrollTo({ top: Math.max(0, targetScroll), behavior });
             }
-        }, albumChanged ? 0 : 50); // No delay for album change
+        }, shouldInstant ? 0 : 50);
 
         return () => clearTimeout(timeoutId);
     }, [currentIndex, ITEM_SIZE, isHorizontal, files]);
@@ -420,7 +426,7 @@ export const Sidebar = ({
 
     return (
         <div
-            className={`bg-surface/30 backdrop-blur-xl overflow-hidden relative transition-all duration-300 ease-out flex-shrink-0 ${
+            className={`bg-surface/30 backdrop-blur-xl overflow-hidden relative flex-shrink-0 ${
                 isHorizontal
                     ? 'w-full border-t border-white/5 flex flex-row'
                     : 'h-full border-r border-white/5 flex flex-col'

@@ -90,10 +90,10 @@ export const InfoPanel = memo(function InfoPanel({ metadata, isVisible = true, m
     return (
         <aside
             style={panelStyle}
-            className="h-full bg-surface/90 backdrop-blur-xl border-l border-black/10 dark:border-white/5 shrink-0"
+            className="h-full min-h-0 bg-surface/90 backdrop-blur-xl border-l border-black/10 dark:border-white/5 shrink-0"
         >
             {/* Fixed width inner container prevents content squish */}
-            <div className="flex flex-col h-full p-6" style={{ width: PANEL_WIDTH, minWidth: PANEL_WIDTH }}>
+            <div className="flex flex-col h-full min-h-0 p-6" style={{ width: PANEL_WIDTH, minWidth: PANEL_WIDTH }}>
                 {metadata ? (
                     <>
                         <div className="flex items-center gap-2 mb-8 border-b border-white/5 pb-4">
