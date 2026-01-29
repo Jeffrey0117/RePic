@@ -16,6 +16,10 @@ export const ImageViewer = ({ src, crop, annotations = [] }) => {
     const [scale, setScale] = useState(1);
     const [imageSize, setImageSize] = useState({ width: 0, height: 0 });
 
+    // Refs to hold latest scale/position for stable event handlers (avoids race conditions)
+    const scaleRef = useRef(1);
+    const positionRef = useRef({ x: 0, y: 0 });
+
     // Draw annotations on canvas overlay
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -61,6 +65,8 @@ export const ImageViewer = ({ src, crop, annotations = [] }) => {
     useEffect(() => {
         if (!src) return;
 
+        scaleRef.current = 1;
+        positionRef.current = { x: 0, y: 0 };
         setScale(1);
         setPosition({ x: 0, y: 0 });
         setProxiedSrc(null);
@@ -241,13 +247,27 @@ export const ImageViewer = ({ src, crop, annotations = [] }) => {
         }
     }, [imageSrc, loadFailed]);
 
-    // Handle scroll wheel zoom - zoom toward mouse position
+    // Sync refs whenever state changes
+    useEffect(() => { scaleRef.current = scale; }, [scale]);
+    useEffect(() => { positionRef.current = position; }, [position]);
+
+    // Stable helpers that read from refs (never recreated)
+    const updateScaleAndPosition = useCallback((newScale, newPosition) => {
+        scaleRef.current = newScale;
+        positionRef.current = newPosition;
+        setScale(newScale);
+        setPosition(newPosition);
+    }, []);
+
+    // Handle scroll wheel zoom - zoom toward mouse position (stable, no deps)
     const handleWheel = useCallback((e) => {
         e.preventDefault();
 
         const container = containerRef.current;
         if (!container) return;
 
+        const currentScale = scaleRef.current;
+        const currentPosition = positionRef.current;
         const rect = container.getBoundingClientRect();
 
         // Mouse position relative to container center
@@ -255,51 +275,51 @@ export const ImageViewer = ({ src, crop, annotations = [] }) => {
         const mouseY = e.clientY - rect.top - rect.height / 2;
 
         const delta = e.deltaY > 0 ? -0.15 : 0.15;
-        const newScale = Math.max(0.5, Math.min(5, scale + delta));
+        const newScale = Math.max(0.5, Math.min(5, currentScale + delta));
 
-        if (newScale !== scale) {
+        if (newScale !== currentScale) {
             // Adjust position to zoom toward mouse
-            const scaleRatio = newScale / scale;
-            const newX = mouseX - (mouseX - position.x) * scaleRatio;
-            const newY = mouseY - (mouseY - position.y) * scaleRatio;
+            const scaleRatio = newScale / currentScale;
+            const newX = mouseX - (mouseX - currentPosition.x) * scaleRatio;
+            const newY = mouseY - (mouseY - currentPosition.y) * scaleRatio;
 
-            setScale(newScale);
-            setPosition({ x: newX, y: newY });
+            updateScaleAndPosition(newScale, { x: newX, y: newY });
         }
-    }, [scale, position]);
+    }, [updateScaleAndPosition]);
 
     // Handle double-click to reset zoom
     const handleDoubleClick = useCallback(() => {
-        setScale(1);
-        setPosition({ x: 0, y: 0 });
-    }, []);
+        updateScaleAndPosition(1, { x: 0, y: 0 });
+    }, [updateScaleAndPosition]);
 
     // Start dragging (panning)
     const handleMouseDown = useCallback((e) => {
-        if (scale <= 1) return; // Only allow panning when zoomed in
+        if (scaleRef.current <= 1) return; // Only allow panning when zoomed in
         e.preventDefault();
         setIsDragging(true);
         setDragStart({
-            x: e.clientX - position.x,
-            y: e.clientY - position.y
+            x: e.clientX - positionRef.current.x,
+            y: e.clientY - positionRef.current.y
         });
-    }, [scale, position]);
+    }, []);
 
     // During drag
+    const dragStartRef = useRef(dragStart);
+    useEffect(() => { dragStartRef.current = dragStart; }, [dragStart]);
+
     const handleMouseMove = useCallback((e) => {
-        if (!isDragging) return;
         setPosition({
-            x: e.clientX - dragStart.x,
-            y: e.clientY - dragStart.y
+            x: e.clientX - dragStartRef.current.x,
+            y: e.clientY - dragStartRef.current.y
         });
-    }, [isDragging, dragStart]);
+    }, []);
 
     // End drag
     const handleMouseUp = useCallback(() => {
         setIsDragging(false);
     }, []);
 
-    // Attach wheel event with passive: false
+    // Attach wheel event once (stable handler, never removed/re-added)
     useEffect(() => {
         const container = containerRef.current;
         if (!container) return;
@@ -333,7 +353,7 @@ export const ImageViewer = ({ src, crop, annotations = [] }) => {
 
     // Handle drag start for system-level drag (only when not zoomed)
     const handleDragStart = useCallback((e) => {
-        if (scale > 1) {
+        if (scaleRef.current > 1) {
             e.preventDefault();
             return;
         }
@@ -342,7 +362,7 @@ export const ImageViewer = ({ src, crop, annotations = [] }) => {
         if (electronAPI?.startDrag && src) {
             electronAPI.startDrag(src);
         }
-    }, [scale, src]);
+    }, [src]);
 
     return (
         <div
