@@ -439,7 +439,7 @@ export const TopBar = ({
                         <div className={`w-px h-5 mx-1 ${theme === 'dark' ? 'bg-white/10' : 'bg-black/10'}`} />
                         <ToolbarButton
                             icon={currentViewMode === 'grid' ? ImageIcon : LayoutGrid}
-                            title={currentViewMode === 'grid' ? t('switchToImageView') || '切換到圖片檢視' : t('switchToGridView') || '切換到網格檢視'}
+                            title={currentViewMode === 'grid' ? t('switchToImageView') : t('switchToGridView')}
                             onClick={onToggleViewLayout}
                             theme={theme}
                         />

@@ -156,5 +156,7 @@
   "scrapeConfirmMessage": "將抓取此網頁的所有圖片",
   "scrapeImages": "抓取",
   "refreshed": "已重整",
-  "imageReloaded": "圖片已重新載入"
+  "imageReloaded": "圖片已重新載入",
+  "switchToImageView": "切換到圖片檢視",
+  "switchToGridView": "切換到網格檢視"
 }

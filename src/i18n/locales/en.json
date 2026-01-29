@@ -156,5 +156,7 @@
   "scrapeConfirmMessage": "Will scrape all images from this page",
   "scrapeImages": "Scrape",
   "refreshed": "Refreshed",
-  "imageReloaded": "Image reloaded"
+  "imageReloaded": "Image reloaded",
+  "switchToImageView": "Switch to Image View",
+  "switchToGridView": "Switch to Grid View"
 }
