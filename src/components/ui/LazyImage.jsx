@@ -42,8 +42,8 @@ export const LazyImage = memo(({
         }
         // Fast path: HTTP URLs render immediately via native <img>
         if (src?.startsWith('http')) return src;
-        // Local files
-        if (src?.startsWith('file://') || src?.startsWith('data:')) return src;
+        // Local files and blob URLs (paste preview)
+        if (src?.startsWith('file://') || src?.startsWith('data:') || src?.startsWith('blob:')) return src;
         return null;
     });
     const [isLoading, setIsLoading] = useState(!loadedSrc);

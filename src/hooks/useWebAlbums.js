@@ -12,7 +12,13 @@ const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9
 const loadFromStorage = () => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
-    return stored ? JSON.parse(stored) : [];
+    if (!stored) return [];
+    const albums = JSON.parse(stored);
+    // Filter out images with expired blob: URLs (from interrupted paste uploads)
+    return albums.map(album => ({
+      ...album,
+      images: album.images.filter(img => !img.url?.startsWith('blob:'))
+    }));
   } catch (e) {
     console.error('[useWebAlbums] Failed to load from localStorage:', e);
     return [];

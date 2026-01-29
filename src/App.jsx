@@ -1563,13 +1563,17 @@ function App() {
         const blob = imageItem.getAsFile();
         if (!blob) return;
 
-        // Convert to base64
-        const reader = new FileReader();
-        reader.onload = async () => {
-          const base64 = reader.result;
+        if (viewMode === 'album' && selectedAlbumId) {
+          // Album mode: show instantly via blob URL, upload in background
+          const blobUrl = URL.createObjectURL(blob);
+          const newImage = addAlbumImage(selectedAlbumId, blobUrl);
+          const newIndex = selectedAlbum?.images?.length || 0;
+          setAlbumImageIndex(newIndex);
+          setAlbumViewMode('image');
 
-          if (viewMode === 'album' && selectedAlbumId) {
-            // Album mode: upload and add URL
+          // Upload in background (user sees image immediately)
+          const capturedAlbumId = selectedAlbumId;
+          (async () => {
             try {
               const formData = new FormData();
               formData.append('file', blob, `paste-${Date.now()}.png`);
@@ -1580,55 +1584,61 @@ function App() {
               const result = await response.json();
               if (result.status === 'success' && result.data) {
                 const imageUrl = result.data.url_direct || result.data.url_preview;
-                addAlbumImage(selectedAlbumId, imageUrl);
-                // Jump to newly added image
-                setAlbumImageIndex(selectedAlbum?.images?.length || 0);
+                // Silently replace blob URL with hosted URL
+                if (newImage?.id) {
+                  updateImageData(capturedAlbumId, newImage.id, { url: imageUrl });
+                }
                 setToast({ visible: true, message: t('imageAdded') });
+              } else {
+                throw new Error('Upload response invalid');
               }
             } catch (err) {
               console.error('[Paste] Upload failed:', err);
               setToast({ visible: true, message: t('uploadFailed', { error: err.message }) });
+              // Remove failed image from album
+              if (newImage?.id) {
+                removeAlbumImage(capturedAlbumId, newImage.id);
+              }
+            } finally {
+              URL.revokeObjectURL(blobUrl);
+            }
+          })();
+          return;
+        }
+
+        // Local mode: needs base64 for file saving
+        const reader = new FileReader();
+        reader.onload = async () => {
+          const base64 = reader.result;
+          const electronAPI = getElectronAPI();
+          if (electronAPI && currentPath) {
+            try {
+              const timestamp = Date.now();
+              const tempFilename = `temp_paste_${timestamp}.png`;
+              const tempFilePath = electronAPI.path.join(currentPath, tempFilename);
+              const result = await electronAPI.saveFile(tempFilePath, base64);
+
+              if (result.success) {
+                loadFolder(currentPath, true);
+                setTimeout(() => {
+                  const newFiles = electronAPI.getFilesInDirectory(currentPath);
+                  const newFileIndex = newFiles.findIndex(f => f === tempFilePath);
+                  if (newFileIndex >= 0) {
+                    selectImage(newFileIndex);
+                  }
+                }, 100);
+                setToast({ visible: true, message: t('imageAdded') });
+              } else {
+                throw new Error(result.error || 'Failed to save file');
+              }
+            } catch (err) {
+              console.error('[Paste] Failed to save temp file:', err);
+              setToast({ visible: true, message: t('saveFailed', { error: err.message }) });
             }
           } else {
-            // Local mode: save to temp file and add to file list
-            const electronAPI = getElectronAPI();
-            if (electronAPI && currentPath) {
-              try {
-                // Generate temp filename
-                const timestamp = Date.now();
-                const tempFilename = `temp_paste_${timestamp}.png`;
-                const tempFilePath = electronAPI.path.join(currentPath, tempFilename);
-
-                // Save the pasted image to temp file
-                const result = await electronAPI.saveFile(tempFilePath, base64);
-
-                if (result.success) {
-                  // Refresh folder to pick up new file
-                  loadFolder(currentPath, true);
-
-                  // Find and select the newly added file
-                  setTimeout(() => {
-                    const newFiles = electronAPI.getFilesInDirectory(currentPath);
-                    const newFileIndex = newFiles.findIndex(f => f === tempFilePath);
-                    if (newFileIndex >= 0) {
-                      selectImage(newFileIndex);
-                    }
-                  }, 100);
-
-                  setToast({ visible: true, message: t('imageAdded') });
-                } else {
-                  throw new Error(result.error || 'Failed to save file');
-                }
-              } catch (err) {
-                console.error('[Paste] Failed to save temp file:', err);
-                setToast({ visible: true, message: t('saveFailed', { error: err.message }) });
-              }
-            } else {
-              // No current path - fallback to old behavior (set as unsaved image)
-              setLocalImage(base64);
-              setIsModified(true);
-              setToast({ visible: true, message: t('imageAdded') });
-            }
+            setLocalImage(base64);
+            setIsModified(true);
+            setToast({ visible: true, message: t('imageAdded') });
           }
         };
         reader.readAsDataURL(blob);
@@ -1692,7 +1702,7 @@ function App() {
 
     window.addEventListener('paste', handlePaste);
     return () => window.removeEventListener('paste', handlePaste);
-  }, [isEditing, viewMode, selectedAlbumId, addAlbumImage, addAlbumImages, selectedAlbum?.images?.length, t, looksLikeImageUrl, confirm, currentPath, loadFolder, selectImage]);
+  }, [isEditing, viewMode, selectedAlbumId, addAlbumImage, addAlbumImages, removeAlbumImage, updateImageData, selectedAlbum?.images?.length, t, looksLikeImageUrl, confirm, currentPath, loadFolder, selectImage]);
 
   return (
     <div

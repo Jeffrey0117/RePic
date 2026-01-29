@@ -106,8 +106,8 @@ export const ImageViewer = ({ src, crop, annotations = [] }) => {
             return;
         }
 
-        // Local files: no loading state needed
-        const isLocal = src.startsWith('file://') || src.startsWith('data:');
+        // Local/blob files: no loading state needed (browser displays natively)
+        const isLocal = src.startsWith('file://') || src.startsWith('data:') || src.startsWith('blob:');
         if (isLocal) {
             setIsLoading(false);
             return;
@@ -314,6 +314,14 @@ export const ImageViewer = ({ src, crop, annotations = [] }) => {
             {src?.startsWith('data:') && (
                 <div className="absolute top-4 right-4 z-10 bg-primary/80 backdrop-blur-md text-[10px] text-white px-2 py-1 rounded-full uppercase tracking-widest font-bold shadow-lg">
                     Unsaved
+                </div>
+            )}
+
+            {/* Processing indicator for blob URLs (paste upload in progress) */}
+            {(src?.startsWith('blob:') || imageSrc?.startsWith('blob:')) && (
+                <div className="absolute top-4 right-4 z-10 bg-black/60 backdrop-blur-md text-[10px] text-white px-3 py-1.5 rounded-full tracking-wide font-medium shadow-lg border border-white/10 flex items-center gap-2">
+                    <div className="w-3 h-3 border-2 border-white/30 border-t-white/80 rounded-full animate-spin" />
+                    載入中
                 </div>
             )}
 
