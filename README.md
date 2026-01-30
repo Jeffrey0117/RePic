@@ -1,131 +1,121 @@
 <div align="center">
-  <img src="repic-logo.png" alt="Repic Logo" width="120">
-  <br>
-  <img src="repic.png" alt="Repic" width="400">
+  <img src="repic-logo.png" alt="RePic Logo" width="120">
+  <br><br>
+  <img src="repic.png" alt="RePic" width="400">
 
-  <p><strong>A powerful, minimalist Image Viewer & Manager with virtual image support.</strong></p>
-  <p>Built with <strong>Electron</strong>, <strong>React</strong>, and <strong>TailwindCSS</strong>.</p>
+  <p><strong>Re:define how you see pictures.</strong></p>
+
+  <p>
+    <a href="https://github.com/Jeffrey0117/RePic/releases"><img src="https://img.shields.io/github/v/release/Jeffrey0117/RePic?label=download&color=0A84FF" alt="Download"></a>
+    <img src="https://img.shields.io/badge/platform-Windows%2010+-0A84FF" alt="Platform">
+    <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License">
+  </p>
+
+  <p>
+    <a href="https://jeffrey0117.github.io/RePic/">Website</a> &middot;
+    <a href="https://jeffrey0117.github.io/RePic/intro.html">Story</a> &middot;
+    <a href="./README.zh-TW.md">繁體中文</a>
+  </p>
 </div>
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
+---
+
+## What is RePic?
+
+RePic is a desktop image viewer and manager that **rethinks how images are stored and organized**.
+
+Instead of downloading every image to your hard drive, RePic introduces **Virtual Albums** — collections of web images that take **zero disk space**. When you need real files, pin them to disk as `.repic` shortcut files (under 1 KB each).
+
+### The core idea
+
+```
+Traditional:  Save image → 5 MB on disk → one copy per device
+RePic:        Drag image → 0 KB (virtual) or <1 KB (.repic) → URL stays in the cloud
+```
 
 ## Features
 
-### Core
-- **Local Folder Browsing** - Open folders and navigate images with keyboard
-- **Web Albums** - Create albums with web image URLs, stored locally
-- **Virtual Images (.repic)** - Lightweight shortcut files pointing to web images
-- **Non-destructive Crop** - Virtual crop that preserves original image
-- **Batch Crop** - Apply same crop ratio to multiple images
+### Virtual Albums — 0 KB
+Drag images from any website into RePic. No downloads, no disk usage — just URLs stored in memory. Browse, crop, and annotate them as if they were local files.
 
-### Image Operations
-- **Upload to Cloud** - One-click upload to urusai.cc, URL auto-copied
-- **Copy to Clipboard** - Copy image (with crop applied) to clipboard
-- **Drag & Drop Export** - Drag images to other apps (Finder, Explorer, etc.)
-- **Multi-select Delete** - Batch delete album images
+### .repic Files — Pin to Disk
+Want real files? Pin an album to create `.repic` shortcut files visible in File Explorer. Each file is a tiny JSON with the image URL — shareable, backupable, double-click to open.
 
-### UX
-- **Scroll Zoom** - Zoom toward mouse position
-- **Drag Pan** - Pan when zoomed in
-- **Keyboard Navigation** - Arrow keys to navigate
-- **Loading States** - Spinner instead of broken image flash
-- **Hotlink Bypass** - Proxy for protected images (Instagram, etc.)
-- **i18n** - English / Traditional Chinese
-
-### Virtual Image System
-The `.repic` format stores:
-- Web image URL
-- Optional crop parameters (non-destructive)
-- Album metadata
-
-Export albums as `.repic` files for lightweight local access without downloading full images.
-
----
-
-## Development
-
-### Prerequisites
-- Node.js v18+
-
-### Run Desktop App
-```bash
-npm run electron:dev
+```json
+{
+  "v": 2,
+  "type": "virtual-image",
+  "url": "https://example.com/photo.jpg",
+  "crop": { "x": 120, "y": 80, "width": 640, "height": 480 }
+}
 ```
 
-### Build for Windows
+### Local → Cloud Virtualization
+Upload a local image to the cloud, then convert it to a `.repic` file. 5 MB photo becomes a 0.5 KB shortcut — 99.99% space savings with the same visual result.
+
+### Everything Else
+- **Blazing fast browsing** — Virtual scrolling + thumbnail preloading
+- **Non-destructive editing** — Crop, annotate, mosaic without touching originals
+- **Drag to share** — Drag images straight to Discord, LINE, or any app
+- **Clipboard paste** — Ctrl+V to import screenshots instantly
+- **Hotlink bypass** — Automatic proxy for protected images (Instagram, etc.)
+- **Dark & light themes** — iOS-inspired UI
+- **i18n** — English / Traditional Chinese
+
+## Getting Started
+
+### Download
+
+Grab the latest installer from [Releases](https://github.com/Jeffrey0117/RePic/releases).
+
+**Requirements:** Windows 10 or later.
+
+### Development
+
 ```bash
+# Install dependencies
+npm install
+
+# Run in development mode
+npm run electron:dev
+
+# Build for Windows
 npm run electron:build
 ```
-Output: `release/` folder
 
----
+Output: `release/` folder with NSIS installer.
 
 ## Tech Stack
-- **Framework**: Electron + Vite + React
-- **Styling**: TailwindCSS v4
-- **Animation**: Framer Motion
-- **Cropping**: react-image-crop
-- **Icons**: Lucide React
 
----
-
-## Changelog
-
-### 2025-01-25
-- **feat**: Multi-select batch delete for album images
-- **feat**: Loading spinner, no broken image flash
-- **fix**: Hash collision for Instagram CDN URLs (MD5)
-- **fix**: GitHub blob URL normalization
-
-### 2025-01-24
-- **feat**: Drag & drop images from web browser to album
-- **feat**: Delete button for album images
-- **feat**: Cropped thumbnails in sidebar
-- **feat**: Virtual image cropping (non-destructive)
-- **feat**: Copy to clipboard with crop applied
-- **feat**: Drag to other apps
-- **perf**: Cache downloaded images
-
-### 2025-01-23
-- **feat**: Virtual image (.repic) file support
-- **feat**: Export albums as .repic shortcuts
-- **feat**: Collapsible album sidebar
-- **feat**: Web image info panel
-
-### Earlier
-- **feat**: Web albums with localStorage persistence
-- **feat**: Upload to urusai.cc cloud
-- **feat**: Batch crop with custom output folder
-- **feat**: Screenshot capture
-- **feat**: i18n (EN/ZH-TW)
-
----
+| Layer | Technology |
+|-------|-----------|
+| Runtime | Electron 31 |
+| Frontend | React 19 + Vite 7 |
+| Styling | TailwindCSS v4 |
+| Image processing | Sharp |
+| Cropping | react-image-crop |
+| Virtual scrolling | react-window |
 
 ## Roadmap
 
-### Phase 1 - Core UX ✅
-- [x] Remember last opened folder
-- [x] Preload adjacent images (3 ahead/behind)
-- [x] Paste image from clipboard (Ctrl+V)
-- [x] Drag to reorder album images
-
-### Phase 2 - Batch Operations
-- [x] Batch download (multi-select → save all)
-- [x] Batch upload (multi-select → upload all)
-- [ ] Batch virtualize (local → upload → .repic, option to delete local)
-- [ ] Batch materialize (.repic → download → local, option to delete .repic)
-
-### Phase 3 - Performance
-- [x] Thumbnail cache (IndexedDB)
-- [ ] Virtual scroll for large image lists
-- [x] Offline cache for web album images
-
-### Phase 4 - Advanced ✅
+- [x] Virtual albums (0 KB web image collections)
+- [x] .repic file format v2 (read, write, batch export)
+- [x] Non-destructive crop & annotations
+- [x] Cloud upload (urusai.cc)
 - [x] Album import/export (JSON backup)
-- [x] Sidebar position toggle (left / bottom)
+- [x] Sidebar position toggle
+- [x] Thumbnail cache (IndexedDB)
+- [x] Offline image cache
+- [ ] Pin album to disk (auto-create .repic folder)
+- [ ] Unpin album (read back to virtual)
+- [ ] Local image → cloud → .repic virtualization
+- [ ] Batch virtualize / materialize
+- [ ] File Explorer shell extension (Windows)
 
----
+## Contributing
+
+Found a bug or have an idea? [Open an issue](https://github.com/Jeffrey0117/RePic/issues) — every report is read.
 
 ## License
 
-MIT
+[MIT](LICENSE)
