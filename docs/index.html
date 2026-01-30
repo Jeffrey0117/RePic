@@ -416,20 +416,20 @@
         <div class="feature-icon">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
         </div>
-        <h3><span class="en">Web albums</span><span class="zh">網頁相簿</span></h3>
+        <h3><span class="en">Web albums &mdash; 0 KB</span><span class="zh">網頁相簿 &mdash; 0 KB</span></h3>
         <p>
-          <span class="en">Drag images from any website directly into RePic albums. Bypass hotlink protection automatically.</span>
-          <span class="zh">從任何網站拖曳圖片到 RePic 相簿，自動繞過防盜連保護。</span>
+          <span class="en">Drag images from any website into virtual albums. No downloads, no disk usage &mdash; true zero space. Hotlink protection bypassed automatically.</span>
+          <span class="zh">從任何網站拖曳圖片到虛擬相簿。不下載、不佔空間 &mdash; 真正的零空間收藏。自動繞過防盜連。</span>
         </p>
       </div>
       <div class="feature-card">
         <div class="feature-icon">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
         </div>
-        <h3><span class="en">Virtual images (.repic)</span><span class="zh">虛擬圖片 (.repic)</span></h3>
+        <h3><span class="en">.repic files</span><span class="zh">.repic 虛擬圖片</span></h3>
         <p>
-          <span class="en">Lightweight shortcuts to web images. A few bytes instead of megabytes, always up to date.</span>
-          <span class="zh">指向網路圖片的輕量捷徑，幾個 byte 取代幾 MB，永遠是最新版。</span>
+          <span class="en">Pin albums to disk as tiny .repic shortcut files (&lt;1 KB each). Visible in File Explorer, shareable, backupable. Or keep them virtual &mdash; your choice.</span>
+          <span class="zh">將相簿釘選到磁碟，每張圖變成不到 1 KB 的 .repic 捷徑檔案。在檔案總管可見、可分享、可備份。或保持虛擬 &mdash; 由你決定。</span>
         </p>
       </div>
       <div class="feature-card">
@@ -471,26 +471,33 @@
       <div class="virtual-content">
         <p class="section-label">.repic format</p>
         <h2 class="section-title">
-          <span class="en">Images without the weight</span>
-          <span class="zh">沒有重量的圖片</span>
+          <span class="en">Two modes, one album</span>
+          <span class="zh">兩種模式，同一個相簿</span>
         </h2>
         <p class="section-desc">
-          <span class="en">A <code>.repic</code> file is a tiny JSON shortcut that points to a web image. It stores the source URL and optional crop parameters &mdash; no pixel data. Double-click to open it instantly in RePic.</span>
-          <span class="zh"><code>.repic</code> 檔案是一個極小的 JSON 捷徑，指向網路上的圖片。只儲存來源 URL 和裁切參數，完全沒有像素資料。雙擊就能在 RePic 中即時開啟。</span>
+          <span class="en">Virtual albums live in memory &mdash; <strong>0 KB on disk</strong>. When you want real files, pin an album to create <code>.repic</code> shortcut files you can see in File Explorer, share, and back up. Each file is a tiny JSON with just a URL and crop parameters &mdash; no pixel data.</span>
+          <span class="zh">虛擬相簿存在記憶體中 &mdash; <strong>磁碟佔用 0 KB</strong>。想要實體檔案時，釘選相簿就會產生 <code>.repic</code> 捷徑檔，在檔案總管可見、可分享、可備份。每個檔案只是一個 JSON，只有 URL 和裁切參數，完全沒有像素資料。</span>
         </p>
         <div class="virtual-stats">
           <div class="virtual-stat">
+            <div class="number">0 KB</div>
+            <div class="label">
+              <span class="en">Virtual album disk usage</span>
+              <span class="zh">虛擬相簿磁碟佔用</span>
+            </div>
+          </div>
+          <div class="virtual-stat">
             <div class="number">&lt;1 KB</div>
             <div class="label">
-              <span class="en">.repic file size</span>
-              <span class="zh">.repic 檔案大小</span>
+              <span class="en">Pinned .repic file</span>
+              <span class="zh">釘選的 .repic 檔案</span>
             </div>
           </div>
           <div class="virtual-stat">
             <div class="number">&infin;</div>
             <div class="label">
-              <span class="en">Images per folder</span>
-              <span class="zh">每個資料夾的圖片數</span>
+              <span class="en">Images per album</span>
+              <span class="zh">每個相簿的圖片數</span>
             </div>
           </div>
         </div>
