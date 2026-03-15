@@ -12,12 +12,14 @@ import { ExportVirtualDialog } from './components/ui/ExportVirtualDialog';
 import { ConfirmDialog } from './components/ui/ConfirmDialog';
 import { AboutDialog } from './components/ui/AboutDialog';
 import { ContextMenu } from './components/ui/ContextMenu';
-import { Copy, Download, FolderOutput, Trash2, Pencil, Grid3x3 } from './components/icons';
+import { Copy, Download, FolderOutput, Trash2, Pencil, Grid3x3, Album as AlbumIcon } from './components/icons';
 import { prepareSingleExport } from './utils/repicFile';
 import { AlbumSidebar } from './features/album/AlbumSidebar';
+import { PokkitSidebar } from './features/pokkit/PokkitSidebar';
 import { ThumbnailGrid } from './components/album/ThumbnailGrid';
 import { useFileSystem } from './hooks/useFileSystem';
 import { useWebAlbums } from './hooks/useWebAlbums';
+import { usePokkit } from './hooks/usePokkit';
 import { useConfirmDialog } from './hooks/useConfirmDialog';
 import useI18n from './hooks/useI18n';
 import { loadImage, PRIORITY_HIGH, clearMemoryCache } from './utils/imageLoader';
@@ -67,6 +69,27 @@ function App() {
     exportAlbums,
     importAlbums
   } = useWebAlbums();
+
+  // Pokkit (cloud) hook
+  const {
+    isAuthenticated: pokkitAuth,
+    user: pokkitUser,
+    albums: pokkitAlbums,
+    selectedAlbumId: pokkitAlbumId,
+    photos: pokkitPhotos,
+    isLoadingAlbums: pokkitLoadingAlbums,
+    isLoadingPhotos: pokkitLoadingPhotos,
+    login: pokkitLogin,
+    logout: pokkitLogout,
+    selectAlbum: pokkitSelectAlbum,
+    refreshAlbums: pokkitRefreshAlbums
+  } = usePokkit();
+
+  // Pokkit image navigation state
+  const [pokkitImageIndex, setPokkitImageIndex] = useState(0);
+
+  // Pokkit sidebar collapsed state
+  const [pokkitSidebarCollapsed, setPokkitSidebarCollapsed] = useState(false);
 
   // Album image navigation state
   const [albumImageIndex, setAlbumImageIndex] = useState(0);
@@ -298,7 +321,14 @@ function App() {
 
   // Refresh current view without changing folder
   const handleRefresh = useCallback(() => {
-    if (viewMode === 'album') {
+    if (viewMode === 'pokkit') {
+      // Pokkit mode: refresh albums from API
+      pokkitRefreshAlbums();
+      if (pokkitAlbumId) {
+        pokkitSelectAlbum(pokkitAlbumId);
+      }
+      setToast({ visible: true, message: t('refreshed') || '已重整' });
+    } else if (viewMode === 'album') {
       // Album mode
       if (albumViewMode === 'grid') {
         // Grid view: clear all image caches and show toast
@@ -338,7 +368,7 @@ function App() {
         }, 50);
       }
     }
-  }, [viewMode, albumViewMode, localViewMode, currentPath, currentImage, currentAlbumImage, loadFolder, t]);
+  }, [viewMode, albumViewMode, localViewMode, currentPath, currentImage, currentAlbumImage, loadFolder, t, pokkitRefreshAlbums, pokkitAlbumId, pokkitSelectAlbum]);
 
   // Track internal drag start (from sidebar thumbnails or image viewer)
   useEffect(() => {
@@ -1142,6 +1172,48 @@ function App() {
   }, []);
 
   const handleSave = async () => {
+    // For pokkit mode: download cloud photo to local
+    if (viewMode === 'pokkit' && pokkitPhotos.length > 0 && pokkitPhotos[pokkitImageIndex]) {
+      const imageUrl = pokkitPhotos[pokkitImageIndex].photoUrl;
+      const electronAPI = getElectronAPI();
+
+      try {
+        const response = await fetch(imageUrl);
+        if (!response.ok) throw new Error('Failed to fetch image');
+        const blob = await response.blob();
+
+        const reader = new FileReader();
+        const base64 = await new Promise((resolve, reject) => {
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+
+        const defaultName = `pokkit-${pokkitPhotos[pokkitImageIndex].id}.webp`;
+
+        if (electronAPI) {
+          const { canceled, filePath } = await electronAPI.showSaveDialog(defaultName);
+          if (!canceled && filePath) {
+            const result = await electronAPI.saveFile(filePath, base64);
+            if (result.success) {
+              setToast({ visible: true, message: t('downloadSuccess') });
+            } else {
+              throw new Error(result.error);
+            }
+          }
+        } else {
+          const link = document.createElement('a');
+          link.download = defaultName;
+          link.href = base64;
+          link.click();
+          setToast({ visible: true, message: t('downloadSuccess') });
+        }
+      } catch (error) {
+        setToast({ visible: true, message: t('downloadFailed', { error: error.message }) });
+      }
+      return;
+    }
+
     // For album mode: download web image to local
     if (viewMode === 'album' && selectedAlbum && selectedAlbum.images[albumImageIndex]) {
       const imageUrl = selectedAlbum.images[albumImageIndex].url;
@@ -1216,6 +1288,11 @@ function App() {
     clearPrefetch(); // Clear old prefetch when switching albums
   }, [selectedAlbumId]);
 
+  // Reset pokkit image index when pokkit album changes
+  useEffect(() => {
+    setPokkitImageIndex(0);
+  }, [pokkitAlbumId]);
+
   // Persist album view mode to localStorage
   useEffect(() => {
     localStorage.setItem('repic-album-view-mode', albumViewMode);
@@ -1289,7 +1366,10 @@ function App() {
     // Determine current image source and crop params
     let imageSrc = null;
     let cropParams = null;
-    if (viewMode === 'album' && currentAlbumImage) {
+    if (viewMode === 'pokkit' && pokkitPhotos.length > 0 && pokkitPhotos[pokkitImageIndex]) {
+      imageSrc = pokkitPhotos[pokkitImageIndex].photoUrl;
+      cropParams = null;
+    } else if (viewMode === 'album' && currentAlbumImage) {
       imageSrc = currentAlbumImage;
       cropParams = albumImages[safeAlbumIndex]?.crop;
     } else if (viewMode === 'virtual' && virtualImageData?.url) {
@@ -1517,6 +1597,20 @@ function App() {
           setViewMode('local');
           setVirtualImageData(null);
         }
+      } else if (viewMode === 'pokkit') {
+        // ESC: return to grid view from image view
+        if (e.key === 'Escape' && albumViewMode === 'image') {
+          setAlbumViewMode('grid');
+        }
+        // Arrow keys: navigate photos (only in image mode with photos)
+        if (albumViewMode === 'image' && pokkitPhotos.length > 0) {
+          if (e.key === 'ArrowRight' && pokkitImageIndex < pokkitPhotos.length - 1) {
+            setPokkitImageIndex(pokkitImageIndex + 1);
+          }
+          if (e.key === 'ArrowLeft' && pokkitImageIndex > 0) {
+            setPokkitImageIndex(pokkitImageIndex - 1);
+          }
+        }
       } else if (viewMode === 'album') {
         // ESC: return to grid view from image view
         if (e.key === 'Escape' && albumViewMode === 'image') {
@@ -1541,7 +1635,7 @@ function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isEditing, viewMode, albumViewMode, localViewMode, nextImage, prevImage, nextAlbumImage, prevAlbumImage, nextVirtualImage, prevVirtualImage]);
+  }, [isEditing, viewMode, albumViewMode, localViewMode, nextImage, prevImage, nextAlbumImage, prevAlbumImage, nextVirtualImage, prevVirtualImage, pokkitImageIndex, pokkitPhotos.length]);
 
   // Paste from clipboard (Ctrl+V / Cmd+V)
   useEffect(() => {
@@ -1741,6 +1835,7 @@ function App() {
         showInfoPanel={showInfoPanel}
         onToggleInfo={() => setShowInfoPanel(!showInfoPanel)}
         viewMode={viewMode}
+        onSetViewMode={(mode) => setViewMode(mode)}
         onToggleViewMode={() => setViewMode(viewMode === 'local' ? 'album' : 'local')}
         selectedAlbum={selectedAlbum}
         onAddAlbumImage={(url) => {
@@ -1786,6 +1881,12 @@ function App() {
         }}
         albumSidebarCollapsed={albumSidebarCollapsed}
         onToggleAlbumSidebar={() => setAlbumSidebarCollapsed(!albumSidebarCollapsed)}
+        pokkitSidebarCollapsed={pokkitSidebarCollapsed}
+        onTogglePokkitSidebar={() => setPokkitSidebarCollapsed(!pokkitSidebarCollapsed)}
+        pokkitAuthenticated={pokkitAuth}
+        pokkitUser={pokkitUser}
+        onPokkitLogin={pokkitLogin}
+        onPokkitLogout={pokkitLogout}
         sidebarPosition={sidebarPosition}
         onToggleSidebarPosition={() => {
           const newPos = sidebarPosition === 'left' ? 'bottom' : 'left';
@@ -1794,11 +1895,11 @@ function App() {
         }}
         onAbout={() => setShowAboutDialog(true)}
         // Grid/Image view toggle - only show when there's content to toggle
-        currentViewMode={viewMode === 'album' ? albumViewMode : localViewMode}
+        currentViewMode={viewMode === 'pokkit' ? albumViewMode : (viewMode === 'album' ? albumViewMode : localViewMode)}
         onToggleViewLayout={
-          (viewMode === 'album' && albumImages.length > 0) || (viewMode === 'local' && files.length > 0)
+          (viewMode === 'pokkit' && pokkitPhotos.length > 0) || (viewMode === 'album' && albumImages.length > 0) || (viewMode === 'local' && files.length > 0)
             ? () => {
-                if (viewMode === 'album') {
+                if (viewMode === 'pokkit' || viewMode === 'album') {
                   setAlbumViewMode(prev => prev === 'grid' ? 'image' : 'grid');
                 } else {
                   setLocalViewMode(prev => prev === 'grid' ? 'image' : 'grid');
@@ -1844,13 +1945,35 @@ function App() {
           }
         }}
         onSave={handleSave}
-        hasImage={!!(localImage || currentAlbumImage || virtualImageData?.url)}
+        hasImage={!!(localImage || currentAlbumImage || virtualImageData?.url || (pokkitPhotos.length > 0 && pokkitPhotos[pokkitImageIndex]))}
         isMultiSelectMode={viewMode === 'album' && isMultiSelectMode}
         selectedImageIds={selectedImageIds}
       />
 
       {/* 2. Main Content Area */}
       <div className="flex-1 overflow-hidden flex flex-row transition-all duration-300">
+        {/* Pokkit Sidebar - cloud albums */}
+        {viewMode === 'pokkit' && (
+          <PokkitSidebar
+            albums={pokkitAlbums}
+            selectedAlbumId={pokkitAlbumId}
+            onSelectAlbum={(albumId) => {
+              pokkitSelectAlbum(albumId);
+              setPokkitImageIndex(0);
+              setAlbumViewMode('grid');
+            }}
+            isAuthenticated={pokkitAuth}
+            user={pokkitUser}
+            onLogin={pokkitLogin}
+            onLogout={pokkitLogout}
+            onRefresh={pokkitRefreshAlbums}
+            isLoadingAlbums={pokkitLoadingAlbums}
+            isLoadingPhotos={pokkitLoadingPhotos}
+            isVisible={true}
+            isCollapsed={pokkitSidebarCollapsed}
+          />
+        )}
+
         {/* Album Sidebar - always full height on the left */}
         {viewMode === 'album' && (
           <AlbumSidebar
@@ -1949,6 +2072,87 @@ function App() {
                   </button>
                 </motion.div>
               ) : null
+            ) : viewMode === 'pokkit' ? (
+              // Pokkit cloud mode - two view modes: grid or image
+              albumViewMode === 'grid' && pokkitPhotos.length > 0 ? (
+                // Grid view - pokkit thumbnail grid
+                <motion.div
+                  key="pokkit-grid"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 z-10 bg-[#0A0A0A]"
+                >
+                  <ThumbnailGrid
+                    images={pokkitPhotos.map((photo, idx) => ({
+                      id: photo.id,
+                      url: photo.thumbUrl,
+                      src: photo.thumbUrl,
+                      name: photo.name || `Photo ${idx + 1}`
+                    }))}
+                    currentIndex={pokkitImageIndex}
+                    onSelectImage={(index) => {
+                      setPokkitImageIndex(index);
+                      setAlbumViewMode('image');
+                    }}
+                    size={gridSize}
+                  />
+                </motion.div>
+              ) : albumViewMode === 'image' && pokkitPhotos.length > 0 && pokkitPhotos[pokkitImageIndex] ? (
+                // Image view - single pokkit photo viewer
+                <motion.div
+                  key="pokkit-viewer"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 z-10 bg-[#0f0f0f]"
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setContextMenu({
+                      isOpen: true,
+                      position: { x: e.clientX, y: e.clientY },
+                      target: { type: 'pokkit-image', photo: pokkitPhotos[pokkitImageIndex] }
+                    });
+                  }}
+                >
+                  <div className="w-full h-full p-4">
+                    <ImageViewer src={pokkitPhotos[pokkitImageIndex].photoUrl} />
+                  </div>
+                </motion.div>
+              ) : (
+                // Empty state for pokkit
+                <motion.div
+                  key="pokkit-empty"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute inset-0 flex flex-col items-center justify-center"
+                >
+                  <div className="flex flex-col items-center max-w-md px-8">
+                    <div className="w-20 h-20 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-6">
+                      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-white/30">
+                        <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
+                      </svg>
+                    </div>
+                    <p className="text-xl font-medium text-white/60">
+                      {!pokkitAuth
+                        ? t('pokkitLoginRequired')
+                        : pokkitAlbums.length === 0
+                          ? t('pokkitNoAlbums')
+                          : t('selectOrCreateAlbum')
+                      }
+                    </p>
+                    {!pokkitAuth && (
+                      <button
+                        onClick={pokkitLogin}
+                        className="mt-6 px-6 py-3 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary/80 transition-colors"
+                      >
+                        {t('connectPokkit')}
+                      </button>
+                    )}
+                  </div>
+                </motion.div>
+              )
             ) : viewMode === 'album' ? (
               // Album mode - two view modes: grid or image
               albumViewMode === 'grid' && albumImages.length > 0 ? (
@@ -2114,18 +2318,25 @@ function App() {
 
         {/* Right: Info Panel - flex item with width transition */}
         <InfoPanel
-          metadata={viewMode === 'album'
-            ? (currentAlbumImage ? {
-                albumName: selectedAlbum?.name,
-                url: currentAlbumImage,
-                addedAt: albumImages[safeAlbumIndex]?.addedAt,
-                index: safeAlbumIndex,
-                total: albumImages.length
+          metadata={viewMode === 'pokkit'
+            ? (pokkitPhotos[pokkitImageIndex] ? {
+                albumName: pokkitAlbums.find(a => a.id === pokkitAlbumId)?.name || 'Pokkit',
+                url: pokkitPhotos[pokkitImageIndex]?.photoUrl,
+                index: pokkitImageIndex,
+                total: pokkitPhotos.length
               } : null)
-            : (currentMetadata ? { ...currentMetadata, filePath: currentImage } : null)
+            : viewMode === 'album'
+              ? (currentAlbumImage ? {
+                  albumName: selectedAlbum?.name,
+                  url: currentAlbumImage,
+                  addedAt: albumImages[safeAlbumIndex]?.addedAt,
+                  index: safeAlbumIndex,
+                  total: albumImages.length
+                } : null)
+              : (currentMetadata ? { ...currentMetadata, filePath: currentImage } : null)
           }
           isVisible={showInfoPanel && !isEditing}
-          mode={viewMode === 'album' ? 'web' : 'local'}
+          mode={viewMode === 'pokkit' ? 'web' : (viewMode === 'album' ? 'web' : 'local')}
         />
         </div>
         </div>
@@ -2221,7 +2432,35 @@ function App() {
         position={contextMenu.position}
         onClose={closeContextMenu}
         items={
-          contextMenu.target?.type === 'image' ? [
+          contextMenu.target?.type === 'pokkit-image' ? [
+            {
+              label: t('copyToClipboard'),
+              icon: Copy,
+              onClick: () => handleCopy()
+            },
+            {
+              label: t('download'),
+              icon: Download,
+              onClick: () => handleSave()
+            },
+            { type: 'separator' },
+            {
+              label: t('saveToVirtualAlbum'),
+              icon: AlbumIcon,
+              onClick: () => {
+                const photo = contextMenu.target?.photo;
+                if (photo) {
+                  let targetAlbumId = albums[0]?.id;
+                  if (!targetAlbumId) {
+                    targetAlbumId = createAlbum('Pokkit Saves');
+                  }
+                  addAlbumImage(targetAlbumId, photo.photoUrl);
+                  setToast({ visible: true, message: t('savedToAlbum') });
+                }
+              }
+            }
+          ]
+          : contextMenu.target?.type === 'image' ? [
             {
               label: t('copyToClipboard'),
               icon: Copy,

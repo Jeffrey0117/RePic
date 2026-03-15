@@ -164,21 +164,36 @@ const looksLikeImageUrl = (url) => {
     return imageExtensions.some(ext => urlPath.endsWith(ext));
 };
 
+// Cloud icon for Pokkit
+const CloudIcon = ({ size = 24, className = '' }) => (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+        <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
+    </svg>
+);
+
 export const TopBar = ({
     currentPath,
     onOpenFolder,
     showInfoPanel,
     onToggleInfo,
     viewMode,
+    onSetViewMode,
     onToggleViewMode,
     selectedAlbum,
     onAddAlbumImage,
     onScrapeUrl,
     albumSidebarCollapsed,
     onToggleAlbumSidebar,
+    pokkitSidebarCollapsed,
+    onTogglePokkitSidebar,
     sidebarPosition,
     onToggleSidebarPosition,
     onAbout,
+    // Pokkit props
+    pokkitAuthenticated,
+    pokkitUser,
+    onPokkitLogin,
+    onPokkitLogout,
     // Toolbar props
     onRefresh,
     onToggleEdit,
@@ -232,6 +247,9 @@ export const TopBar = ({
 
     // Get folder name using electronAPI or fallback
     const getFolderName = () => {
+        if (viewMode === 'pokkit') {
+            return t('pokkitAlbums');
+        }
         if (viewMode === 'album') {
             return selectedAlbum?.name || t('selectOrCreateAlbum');
         }
@@ -294,18 +312,18 @@ export const TopBar = ({
         >
             {/* Left: Folder/Album Info */}
             <div className="flex items-center gap-2">
-                {/* Album sidebar toggle - only in album mode */}
-                {viewMode === 'album' && (
+                {/* Sidebar toggle - album or pokkit mode */}
+                {(viewMode === 'album' || viewMode === 'pokkit') && (
                     <button
-                        onClick={onToggleAlbumSidebar}
+                        onClick={viewMode === 'pokkit' ? onTogglePokkitSidebar : onToggleAlbumSidebar}
                         className={`p-2 rounded-lg transition-all ${
-                            albumSidebarCollapsed
+                            (viewMode === 'album' ? albumSidebarCollapsed : pokkitSidebarCollapsed)
                                 ? 'bg-primary/20 text-primary'
                                 : theme === 'dark'
                                     ? 'hover:bg-white/10 text-white/60'
                                     : 'hover:bg-black/10 text-gray-500'
                         }`}
-                        title={albumSidebarCollapsed ? t('expandSidebar') : t('collapseSidebar')}
+                        title={(viewMode === 'album' ? albumSidebarCollapsed : pokkitSidebarCollapsed) ? t('expandSidebar') : t('collapseSidebar')}
                     >
                         <PanelLeft size={18} />
                     </button>
@@ -313,7 +331,7 @@ export const TopBar = ({
 
                 <div
                     className={`flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all border ${
-                        viewMode === 'album' ? '' : 'cursor-pointer'
+                        viewMode === 'album' || viewMode === 'pokkit' ? '' : 'cursor-pointer'
                     } ${
                         theme === 'dark'
                             ? 'bg-white/5 hover:bg-white/10 border-white/5'
@@ -321,7 +339,9 @@ export const TopBar = ({
                     }`}
                     onClick={viewMode === 'local' ? onOpenFolder : undefined}
                 >
-                    {viewMode === 'album' ? (
+                    {viewMode === 'pokkit' ? (
+                        <CloudIcon size={16} className="text-primary" />
+                    ) : viewMode === 'album' ? (
                         <Album size={16} className="text-primary" />
                     ) : (
                         <FolderOpen size={16} className="text-primary" />
@@ -329,21 +349,37 @@ export const TopBar = ({
                     <span className={`text-xs font-medium max-w-[150px] truncate ${theme === 'dark' ? 'text-white/80' : 'text-gray-700'}`}>{folderName}</span>
                 </div>
 
-                {/* Mode toggle - moved to left side */}
-                <button
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                        viewMode === 'album'
-                            ? 'bg-primary/20 text-primary'
-                            : theme === 'dark'
-                                ? 'bg-white/5 hover:bg-white/10 text-white/70'
-                                : 'bg-black/5 hover:bg-black/10 text-gray-600'
-                    }`}
-                    onClick={onToggleViewMode}
-                    title={t('webAlbum')}
-                >
-                    <Album size={14} />
-                    <span>{viewMode === 'album' ? t('album') : t('local')}</span>
-                </button>
+                {/* 3-way view mode segmented control */}
+                <div className={`flex items-center rounded-lg overflow-hidden border ${
+                    theme === 'dark'
+                        ? 'bg-white/5 border-white/10'
+                        : 'bg-black/5 border-black/10'
+                }`}>
+                    {[
+                        { mode: 'local', icon: FolderOpen, label: t('local') },
+                        { mode: 'album', icon: Album, label: t('album') },
+                        { mode: 'pokkit', icon: CloudIcon, label: t('pokkit') }
+                    ].map(({ mode, icon: Icon, label }) => (
+                        <button
+                            key={mode}
+                            className={`flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium transition-all relative ${
+                                viewMode === mode
+                                    ? 'bg-primary/20 text-primary'
+                                    : theme === 'dark'
+                                        ? 'hover:bg-white/10 text-white/50'
+                                        : 'hover:bg-black/10 text-gray-500'
+                            }`}
+                            onClick={() => onSetViewMode ? onSetViewMode(mode) : (mode !== viewMode && onToggleViewMode?.())}
+                            title={label}
+                        >
+                            <Icon size={13} />
+                            <span>{label}</span>
+                            {mode === 'pokkit' && pokkitAuthenticated && (
+                                <span className="w-1.5 h-1.5 rounded-full bg-green-400 absolute top-1 right-1" />
+                            )}
+                        </button>
+                    ))}
+                </div>
 
                 {/* Add URL button - Album mode only */}
                 {viewMode === 'album' && selectedAlbum && (
@@ -527,6 +563,30 @@ export const TopBar = ({
                                     <Globe size={16} />
                                     <span>{t('changeLanguage')}</span>
                                     <span className={`ml-auto text-xs font-bold ${theme === 'dark' ? 'text-white/50' : 'text-gray-400'}`}>{langDisplay}</span>
+                                </button>
+                                <div className={`my-1 h-px ${theme === 'dark' ? 'bg-white/10' : 'bg-black/10'}`} />
+                                <button
+                                    onClick={() => {
+                                        if (pokkitAuthenticated) {
+                                            onPokkitLogout?.();
+                                        } else {
+                                            onPokkitLogin?.();
+                                        }
+                                        setShowSettingsMenu(false);
+                                    }}
+                                    className={`w-full flex items-center gap-3 px-3 py-2 text-sm transition-colors ${
+                                        theme === 'dark'
+                                            ? 'hover:bg-white/10 text-white/80'
+                                            : 'hover:bg-black/5 text-gray-700'
+                                    }`}
+                                >
+                                    <CloudIcon size={16} />
+                                    <span>{pokkitAuthenticated ? t('disconnectPokkit') : t('connectPokkit')}</span>
+                                    {pokkitAuthenticated && pokkitUser && (
+                                        <span className={`ml-auto text-xs truncate max-w-[60px] ${theme === 'dark' ? 'text-white/40' : 'text-gray-400'}`}>
+                                            {pokkitUser.name || pokkitUser.email}
+                                        </span>
+                                    )}
                                 </button>
                                 <div className={`my-1 h-px ${theme === 'dark' ? 'bg-white/10' : 'bg-black/10'}`} />
                                 <button

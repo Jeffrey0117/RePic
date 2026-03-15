@@ -158,5 +158,19 @@
   "refreshed": "已重整",
   "imageReloaded": "圖片已重新載入",
   "switchToImageView": "切換到圖片檢視",
-  "switchToGridView": "切換到網格檢視"
+  "switchToGridView": "切換到網格檢視",
+  "pokkit": "Pokkit",
+  "connectPokkit": "連接 Pokkit",
+  "disconnectPokkit": "中斷 Pokkit",
+  "pokkitAlbums": "雲端相簿",
+  "pokkitLogin": "登入",
+  "pokkitLogout": "登出",
+  "pokkitLoading": "載入相簿中...",
+  "pokkitLoadingPhotos": "載入照片中...",
+  "pokkitNoAlbums": "沒有相簿",
+  "pokkitLoginRequired": "登入以瀏覽您的雲端相簿",
+  "pokkitAuthExpired": "登入已過期，請重新登入",
+  "saveToVirtualAlbum": "儲存到虛擬相簿",
+  "savedToAlbum": "已儲存到相簿！",
+  "pokkitRefresh": "重新整理相簿"
 }

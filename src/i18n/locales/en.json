@@ -158,5 +158,19 @@
   "refreshed": "Refreshed",
   "imageReloaded": "Image reloaded",
   "switchToImageView": "Switch to Image View",
-  "switchToGridView": "Switch to Grid View"
+  "switchToGridView": "Switch to Grid View",
+  "pokkit": "Pokkit",
+  "connectPokkit": "Connect Pokkit",
+  "disconnectPokkit": "Disconnect Pokkit",
+  "pokkitAlbums": "Cloud Albums",
+  "pokkitLogin": "Sign In",
+  "pokkitLogout": "Sign Out",
+  "pokkitLoading": "Loading albums...",
+  "pokkitLoadingPhotos": "Loading photos...",
+  "pokkitNoAlbums": "No albums",
+  "pokkitLoginRequired": "Sign in to browse your cloud albums",
+  "pokkitAuthExpired": "Session expired, please sign in again",
+  "saveToVirtualAlbum": "Save to Virtual Album",
+  "savedToAlbum": "Saved to album!",
+  "pokkitRefresh": "Refresh albums"
 }
