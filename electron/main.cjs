@@ -1582,6 +1582,95 @@ function setupIpcHandlers() {
             return { success: false, error: e.message };
         }
     });
+
+    // Batch crop ALL files in the main process with Sharp (parallel, no renderer canvas
+    // decode/PNG-encode, no base64 over IPC). Streams progress via 'batch-crop-progress'.
+    // Returns { fallback: true } if Sharp is unavailable so the renderer can fall back.
+    ipcMain.handle('batch-crop-all', async (event, { files, cropPercent, outputMode, customDir, requestId }) => {
+        if (!sharp) {
+            return { success: false, error: 'sharp-unavailable', fallback: true };
+        }
+        if (!Array.isArray(files) || files.length === 0) {
+            return { success: false, error: 'No files provided' };
+        }
+        if (!cropPercent || typeof cropPercent.width !== 'number' || typeof cropPercent.height !== 'number') {
+            return { success: false, error: 'Invalid crop' };
+        }
+        if (!['replace', 'folder', 'custom'].includes(outputMode)) {
+            return { success: false, error: 'Invalid output mode' };
+        }
+        if (customDir && !isValidPath(customDir)) {
+            return { success: false, error: 'Invalid custom directory' };
+        }
+
+        const total = files.length;
+        let done = 0;
+        let successCount = 0;
+        let failCount = 0;
+        const results = [];
+
+        const cropOne = async ({ filePath, originalPath }) => {
+            try {
+                if (!isValidPath(filePath)) throw new Error('Invalid file path');
+                if (originalPath && !isValidPath(originalPath)) throw new Error('Invalid original path');
+
+                // Resolve target path (mirrors batch-crop-save semantics)
+                let targetPath = filePath;
+                if (outputMode === 'custom' && customDir) {
+                    await fs.promises.mkdir(customDir, { recursive: true });
+                    targetPath = path.join(customDir, path.basename(originalPath || filePath));
+                } else if (outputMode === 'folder') {
+                    const croppedDir = path.join(path.dirname(originalPath || filePath), 'cropped');
+                    await fs.promises.mkdir(croppedDir, { recursive: true });
+                    targetPath = path.join(croppedDir, path.basename(originalPath || filePath));
+                }
+
+                // Read into a buffer first so writing back to the same path (replace mode) is safe.
+                const inputBuffer = await fs.promises.readFile(filePath);
+                const meta = await sharp(inputBuffer).metadata();
+                const W = meta.width || 0;
+                const H = meta.height || 0;
+                if (!W || !H) throw new Error('Could not read image dimensions');
+
+                let left = Math.round((cropPercent.x / 100) * W);
+                let top = Math.round((cropPercent.y / 100) * H);
+                let width = Math.round((cropPercent.width / 100) * W);
+                let height = Math.round((cropPercent.height / 100) * H);
+                left = Math.max(0, Math.min(left, W - 1));
+                top = Math.max(0, Math.min(top, H - 1));
+                width = Math.max(1, Math.min(width, W - left));
+                height = Math.max(1, Math.min(height, H - top));
+
+                // No format method => Sharp preserves the input format on toBuffer.
+                const outBuffer = await sharp(inputBuffer).extract({ left, top, width, height }).toBuffer();
+                await fs.promises.writeFile(targetPath, outBuffer);
+
+                successCount++;
+                results.push({ filePath, success: true, path: targetPath });
+            } catch (e) {
+                failCount++;
+                results.push({ filePath, success: false, error: e.message });
+            } finally {
+                done++;
+                try {
+                    event.sender.send('batch-crop-progress', { requestId, done, total });
+                } catch (_) { /* sender gone */ }
+            }
+        };
+
+        // Bounded-concurrency pool: use Sharp's parallelism without spawning N ops at once.
+        const CONCURRENCY = 4;
+        let cursor = 0;
+        const workers = Array.from({ length: Math.min(CONCURRENCY, total) }, async () => {
+            while (cursor < total) {
+                const idx = cursor++;
+                await cropOne(files[idx]);
+            }
+        });
+        await Promise.all(workers);
+
+        return { success: failCount === 0, successCount, failCount, results };
+    });
 }
 
 app.whenReady().then(() => {

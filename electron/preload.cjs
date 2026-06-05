@@ -75,6 +75,37 @@ contextBridge.exposeInMainWorld('electronAPI', {
         });
     },
 
+    // Batch crop ALL files in the main process with Sharp (parallel). Streams onProgress(done, total).
+    // files: [{ filePath, originalPath }]; options: { cropPercent:{x,y,width,height}, outputMode, customDir, onProgress }
+    batchCropAll: async (files, options = {}) => {
+        if (!Array.isArray(files) || files.length === 0) {
+            return { success: false, error: 'No files provided' };
+        }
+        const { cropPercent, outputMode, customDir, onProgress } = options;
+        if (!['replace', 'folder', 'custom'].includes(outputMode)) {
+            return { success: false, error: 'Invalid output mode' };
+        }
+        if (customDir && !isValidPath(customDir)) {
+            return { success: false, error: 'Invalid custom directory' };
+        }
+        const requestId = `crop-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+        let handler = null;
+        if (onProgress) {
+            handler = (_event, data) => {
+                if (data.requestId === requestId) {
+                    onProgress(data.done, data.total);
+                }
+            };
+            ipcRenderer.on('batch-crop-progress', handler);
+        }
+        try {
+            return await ipcRenderer.invoke('batch-crop-all', { files, cropPercent, outputMode, customDir, requestId });
+        } finally {
+            if (handler) ipcRenderer.removeListener('batch-crop-progress', handler);
+        }
+    },
+
     // Get file metadata
     getFileMetadata: async (filePath) => {
         if (!isValidPath(filePath)) {

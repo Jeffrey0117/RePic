@@ -678,7 +678,31 @@ function App() {
     // Include current image + selected images
     const allIndexes = [currentIndex, ...selectedIndexes];
 
-    for (let i = 0; i < allIndexes.length; i++) {
+    // Fast path: crop everything in the main process with Sharp (parallel, no renderer
+    // canvas decode/PNG-encode, no base64 over IPC). Falls back to the canvas loop below
+    // if the API or Sharp is unavailable.
+    let usedFastPath = false;
+    if (electronAPI.batchCropAll) {
+      const fileList = allIndexes
+        .map((idx) => files[idx])
+        .filter(Boolean)
+        .map((filePath) => ({ filePath, originalPath: filePath }));
+
+      const res = await electronAPI.batchCropAll(fileList, {
+        cropPercent: { x: batchCrop.x, y: batchCrop.y, width: batchCrop.width, height: batchCrop.height },
+        outputMode,
+        customDir,
+        onProgress: (done) => onProgress(done),
+      });
+
+      if (res && !res.fallback) {
+        usedFastPath = true;
+        successCount = res.successCount || 0;
+        failCount = res.failCount || 0;
+      }
+    }
+
+    for (let i = 0; !usedFastPath && i < allIndexes.length; i++) {
       const filePath = files[allIndexes[i]];
       console.log(`[handleBatchCropConfirm] Processing ${i + 1}/${allIndexes.length}: ${filePath}`);
       onProgress(i + 1);
