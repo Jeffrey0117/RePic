@@ -2,6 +2,8 @@
   "name": "repic",
   "private": true,
   "version": "0.1.0-beta",
+  "description": "RePic — desktop image viewer/manager with zero-KB virtual albums",
+  "author": "Jeffrey0117",
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
@@ -10,7 +12,8 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "electron:dev": "concurrently -k \"cross-env BROWSER=none npm run dev\" \"wait-on http://localhost:3000 && node electron/start.cjs\"",
-    "electron:build": "vite build && electron-builder && node scripts/post-build.cjs"
+    "build:scraper": "cd scraper && go build -o repic-scraper.exe .",
+    "electron:build": "npm run build:scraper && vite build && electron-builder && node scripts/post-build.cjs"
   },
   "build": {
     "appId": "com.repic.app",
@@ -21,6 +24,23 @@
     "directories": {
       "output": "release"
     },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Jeffrey0117",
+        "repo": "RePic"
+      }
+    ],
+    "asarUnpack": [
+      "**/node_modules/sharp/**",
+      "**/node_modules/@img/**"
+    ],
+    "extraResources": [
+      {
+        "from": "scraper/repic-scraper.exe",
+        "to": "scraper/repic-scraper.exe"
+      }
+    ],
     "files": [
       "dist/**/*",
       "electron/**/*",
@@ -112,6 +132,7 @@
     ]
   },
   "dependencies": {
+    "electron-updater": "^6.8.3",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-image-crop": "^11.0.10",

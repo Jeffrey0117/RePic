@@ -64,6 +64,36 @@ async function removeBgPixels(data) {
     }
 }
 
+// Resolve the bundled Go scraper binary. In dev it lives in the repo's scraper/ dir;
+// in the packaged app it's shipped via electron-builder extraResources into
+// resources/scraper/. Using __dirname (inside app.asar) would not exist when packaged.
+function getScraperPath() {
+    return app.isPackaged
+        ? path.join(process.resourcesPath, 'scraper', 'repic-scraper.exe')
+        : path.join(__dirname, '..', 'scraper', 'repic-scraper.exe');
+}
+
+// Auto-update (packaged builds only): on launch, check GitHub Releases, download any
+// newer version in the background, and install it on the next quit. Silent by design —
+// install once per machine, then every update lands automatically with zero friction.
+function setupAutoUpdater() {
+    if (!app.isPackaged) return; // never run in dev
+    let autoUpdater;
+    try {
+        ({ autoUpdater } = require('electron-updater'));
+    } catch (e) {
+        console.error('[updater] electron-updater unavailable:', e.message);
+        return;
+    }
+    autoUpdater.autoDownload = true;
+    autoUpdater.autoInstallOnAppQuit = true;
+    autoUpdater.on('error', (err) => console.error('[updater] error:', err?.message || err));
+    autoUpdater.on('update-available', (info) => console.log('[updater] update available:', info?.version));
+    autoUpdater.on('update-not-available', () => console.log('[updater] up to date'));
+    autoUpdater.on('update-downloaded', (info) => console.log('[updater] downloaded; will install on quit:', info?.version));
+    autoUpdater.checkForUpdates().catch((e) => console.error('[updater] check failed:', e?.message || e));
+}
+
 // Temp directory for drag & drop
 const TEMP_DIR = path.join(os.tmpdir(), 'repic-temp');
 const TEMP_EXPIRY_MS = 60 * 60 * 1000; // 1 hour
@@ -610,7 +640,7 @@ function setupIpcHandlers() {
 
     // Native crop using Go
     ipcMain.handle('native-crop', async (event, { inputPath, outputPath, crop }) => {
-        const scraperPath = path.join(__dirname, '..', 'scraper', 'repic-scraper.exe');
+        const scraperPath = getScraperPath();
         if (!fs.existsSync(scraperPath)) {
             return { success: false, error: 'Go processor not found', fallback: true };
         }
@@ -653,7 +683,7 @@ function setupIpcHandlers() {
 
     // Native compress using Go
     ipcMain.handle('native-compress', async (event, { inputPath, outputPath, quality }) => {
-        const scraperPath = path.join(__dirname, '..', 'scraper', 'repic-scraper.exe');
+        const scraperPath = getScraperPath();
         if (!fs.existsSync(scraperPath)) {
             return { success: false, error: 'Go processor not found' };
         }
@@ -687,7 +717,7 @@ function setupIpcHandlers() {
 
     // Check if native processing is available (Go scraper)
     ipcMain.handle('native-available', () => {
-        const scraperPath = path.join(__dirname, '..', 'scraper', 'repic-scraper.exe');
+        const scraperPath = getScraperPath();
         return { available: fs.existsSync(scraperPath) };
     });
 
@@ -1153,7 +1183,7 @@ function setupIpcHandlers() {
     // Try Go scraper first (faster), fallback to Node.js
     const scrapeWithGo = (url) => {
         return new Promise((resolve) => {
-            const scraperPath = path.join(__dirname, '..', 'scraper', 'repic-scraper.exe');
+            const scraperPath = getScraperPath();
 
             // Check if Go scraper exists
             if (!fs.existsSync(scraperPath)) {
@@ -1207,7 +1237,7 @@ function setupIpcHandlers() {
     // Batch download with Go (faster than Node.js Promise.all)
     const batchDownloadWithGo = (urls, outputDir, concurrency = 8) => {
         return new Promise((resolve) => {
-            const scraperPath = path.join(__dirname, '..', 'scraper', 'repic-scraper.exe');
+            const scraperPath = getScraperPath();
 
             if (!fs.existsSync(scraperPath)) {
                 console.log('[batch-download] Go downloader not found');
@@ -1317,7 +1347,7 @@ function setupIpcHandlers() {
     // Batch thumbnail generation with Go (faster than Canvas)
     const batchThumbnailsWithGo = (files, outputDir, size = 200, concurrency = 8, base64 = true) => {
         return new Promise((resolve) => {
-            const scraperPath = path.join(__dirname, '..', 'scraper', 'repic-scraper.exe');
+            const scraperPath = getScraperPath();
 
             if (!fs.existsSync(scraperPath)) {
                 console.log('[batch-thumbnails] Go processor not found');
@@ -1401,7 +1431,7 @@ function setupIpcHandlers() {
 
     // Streaming thumbnail generation - returns immediately, sends results via IPC events
     ipcMain.handle('batch-thumbnails-stream', async (event, { files, size, concurrency, requestId }) => {
-        const scraperPath = path.join(__dirname, '..', 'scraper', 'repic-scraper.exe');
+        const scraperPath = getScraperPath();
 
         if (!fs.existsSync(scraperPath)) {
             console.log('[batch-thumbnails-stream] Go processor not found');
@@ -1466,7 +1496,7 @@ function setupIpcHandlers() {
 
     // Prefetch images to temp - streaming download with local paths
     ipcMain.handle('prefetch-images', async (event, { urls, requestId }) => {
-        const scraperPath = path.join(__dirname, '..', 'scraper', 'repic-scraper.exe');
+        const scraperPath = getScraperPath();
 
         if (!fs.existsSync(scraperPath)) {
             console.log('[prefetch-images] Go processor not found');
@@ -1727,6 +1757,7 @@ app.whenReady().then(() => {
 
     setupIpcHandlers();
     createWindow();
+    setupAutoUpdater();
 
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) {
