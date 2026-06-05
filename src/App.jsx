@@ -2045,6 +2045,86 @@ function App() {
         <main
           className="flex-1 min-w-0 min-h-0 relative main-viewport-bg overflow-hidden"
         >
+          {/*
+            Persistent thumbnail grids — kept mounted across the grid<->image toggle
+            so switching is instant (no unmount/remount, no thumbnail re-decode or
+            background re-fetch). Visibility is toggled via `display`; the grid only
+            unmounts when you leave its viewMode entirely.
+          */}
+          {viewMode === 'pokkit' && pokkitPhotos.length > 0 && (
+            <div
+              className="absolute inset-0 z-10 bg-[#0A0A0A]"
+              style={{ display: albumViewMode === 'grid' ? 'block' : 'none' }}
+            >
+              <ThumbnailGrid
+                images={pokkitPhotos.map((photo, idx) => ({
+                  id: photo.id,
+                  url: photo.thumbUrl,
+                  src: photo.thumbUrl,
+                  name: photo.name || `Photo ${idx + 1}`
+                }))}
+                currentIndex={pokkitImageIndex}
+                onSelectImage={(index) => {
+                  setPokkitImageIndex(index);
+                  setAlbumViewMode('image');
+                }}
+                size={gridSize}
+              />
+            </div>
+          )}
+          {viewMode === 'album' && albumImages.length > 0 && (
+            <div
+              className="absolute inset-0 z-10 bg-[#0A0A0A]"
+              style={{ display: albumViewMode === 'grid' ? 'block' : 'none' }}
+            >
+              <ThumbnailGrid
+                images={albumImages}
+                currentIndex={safeAlbumIndex}
+                onSelectImage={(index) => {
+                  setAlbumImageIndex(index);
+                  setAlbumViewMode('image');
+                }}
+                size={gridSize}
+                isMultiSelectMode={isMultiSelectMode}
+                selectedImageIds={selectedImageIds}
+                processingImageIds={processingImageIds}
+                onToggleSelect={(imageId) => {
+                  setSelectedImageIds(prev => {
+                    const newSet = new Set(prev);
+                    if (newSet.has(imageId)) {
+                      newSet.delete(imageId);
+                    } else {
+                      newSet.add(imageId);
+                    }
+                    return newSet;
+                  });
+                }}
+                onRemoveBackground={handleRemoveBackground}
+                onRenameImage={handleRenameAlbumImage}
+              />
+            </div>
+          )}
+          {viewMode === 'local' && files.length > 0 && (
+            <div
+              className="absolute inset-0 z-10 bg-[#0A0A0A]"
+              style={{ display: localViewMode === 'grid' ? 'block' : 'none' }}
+            >
+              <ThumbnailGrid
+                images={files.map((file, idx) => {
+                  const electronAPI = getElectronAPI();
+                  const name = electronAPI?.path?.basename(file) || file.split(/[\\/]/).pop() || `Image ${idx + 1}`;
+                  return { id: idx, url: file, src: file, name };
+                })}
+                currentIndex={currentIndex}
+                onSelectImage={(index) => {
+                  selectImage(index);
+                  setLocalViewMode('image');
+                }}
+                size={gridSize}
+                onRenameImage={handleRenameLocalFile}
+              />
+            </div>
+          )}
           <AnimatePresence>
             {viewMode === 'virtual' ? (
               // Virtual image mode (opened from .repic file)
@@ -2074,31 +2154,9 @@ function App() {
               ) : null
             ) : viewMode === 'pokkit' ? (
               // Pokkit cloud mode - two view modes: grid or image
-              albumViewMode === 'grid' && pokkitPhotos.length > 0 ? (
-                // Grid view - pokkit thumbnail grid
-                <motion.div
-                  key="pokkit-grid"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="absolute inset-0 z-10 bg-[#0A0A0A]"
-                >
-                  <ThumbnailGrid
-                    images={pokkitPhotos.map((photo, idx) => ({
-                      id: photo.id,
-                      url: photo.thumbUrl,
-                      src: photo.thumbUrl,
-                      name: photo.name || `Photo ${idx + 1}`
-                    }))}
-                    currentIndex={pokkitImageIndex}
-                    onSelectImage={(index) => {
-                      setPokkitImageIndex(index);
-                      setAlbumViewMode('image');
-                    }}
-                    size={gridSize}
-                  />
-                </motion.div>
-              ) : albumViewMode === 'image' && pokkitPhotos.length > 0 && pokkitPhotos[pokkitImageIndex] ? (
+              // Grid is rendered by the persistent block above; render nothing here for it.
+              albumViewMode === 'grid' && pokkitPhotos.length > 0 ? null
+              : albumViewMode === 'image' && pokkitPhotos.length > 0 && pokkitPhotos[pokkitImageIndex] ? (
                 // Image view - single pokkit photo viewer
                 <motion.div
                   key="pokkit-viewer"
@@ -2155,42 +2213,9 @@ function App() {
               )
             ) : viewMode === 'album' ? (
               // Album mode - two view modes: grid or image
-              albumViewMode === 'grid' && albumImages.length > 0 ? (
-                // Grid view - thumbnail grid
-                <motion.div
-                  key="album-grid"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="absolute inset-0 z-10 bg-[#0A0A0A]"
-                >
-                  <ThumbnailGrid
-                    images={albumImages}
-                    currentIndex={safeAlbumIndex}
-                    onSelectImage={(index) => {
-                      setAlbumImageIndex(index);
-                      setAlbumViewMode('image');
-                    }}
-                    size={gridSize}
-                    isMultiSelectMode={isMultiSelectMode}
-                    selectedImageIds={selectedImageIds}
-                    processingImageIds={processingImageIds}
-                    onToggleSelect={(imageId) => {
-                      setSelectedImageIds(prev => {
-                        const newSet = new Set(prev);
-                        if (newSet.has(imageId)) {
-                          newSet.delete(imageId);
-                        } else {
-                          newSet.add(imageId);
-                        }
-                        return newSet;
-                      });
-                    }}
-                    onRemoveBackground={handleRemoveBackground}
-                    onRenameImage={handleRenameAlbumImage}
-                  />
-                </motion.div>
-              ) : albumViewMode === 'image' && currentAlbumImage ? (
+              // Grid is rendered by the persistent block above; render nothing here for it.
+              albumViewMode === 'grid' && albumImages.length > 0 ? null
+              : albumViewMode === 'image' && currentAlbumImage ? (
                 // Image view - single image viewer
                 <motion.div
                   key="album-viewer"
@@ -2263,31 +2288,9 @@ function App() {
               )
             ) : (
               // Local mode - two view modes: grid or image
-              localViewMode === 'grid' && files.length > 0 ? (
-                // Grid view
-                <motion.div
-                  key="local-grid"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="absolute inset-0 z-10 bg-[#0A0A0A]"
-                >
-                  <ThumbnailGrid
-                    images={files.map((file, idx) => {
-                      const electronAPI = getElectronAPI();
-                      const name = electronAPI?.path?.basename(file) || file.split(/[\\/]/).pop() || `Image ${idx + 1}`;
-                      return { id: idx, url: file, src: file, name };
-                    })}
-                    currentIndex={currentIndex}
-                    onSelectImage={(index) => {
-                      selectImage(index);
-                      setLocalViewMode('image');
-                    }}
-                    size={gridSize}
-                    onRenameImage={handleRenameLocalFile}
-                  />
-                </motion.div>
-              ) : localViewMode === 'image' && localImage && !isEditing ? (
+              // Grid is rendered by the persistent block above; render nothing here for it.
+              localViewMode === 'grid' && files.length > 0 ? null
+              : localViewMode === 'image' && localImage && !isEditing ? (
                 // Image view
                 <motion.div
                   key={localViewerKey}

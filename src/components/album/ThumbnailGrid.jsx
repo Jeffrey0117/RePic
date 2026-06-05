@@ -184,7 +184,11 @@ export const ThumbnailGrid = ({
               `}
               style={{
                 aspectRatio: '1',
-                height: `${thumbSize}px`
+                height: `${thumbSize}px`,
+                // Skip rendering/decoding work for off-screen thumbnails.
+                // intrinsic size matches the fixed cell so scroll height stays stable.
+                contentVisibility: 'auto',
+                containIntrinsicSize: `${thumbSize}px ${thumbSize}px`
               }}
               onClick={(e) => {
                 if (isMultiSelectMode) {
