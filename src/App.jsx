@@ -218,24 +218,27 @@ function App() {
     }
   }, [currentImage, cacheVersion]); // Also depend on cacheVersion for refresh after save
 
-  // Listen for file open events (from file association / command line)
-  useEffect(() => {
-    const electronAPI = getElectronAPI();
-    if (electronAPI?.onOpenFile) {
-      electronAPI.onOpenFile((filePath) => {
-        loadFile(filePath);
-      });
-    }
-  }, [loadFile]);
-
   // Virtual image state (for opening .repic files directly)
   const [virtualImageData, setVirtualImageData] = useState(null);
   const [virtualSiblings, setVirtualSiblings] = useState([]);
   const [virtualIndex, setVirtualIndex] = useState(0);
 
-  // Listen for virtual image open events (.repic files)
+  // Keep latest values for the file-open IPC listeners, which we register ONCE below.
+  // (The old effects re-ran on every loadFile/albums change and added a new ipcRenderer
+  // listener each time without removing the old one — an unbounded listener leak.)
+  const loadFileRef = useRef(loadFile);
+  const albumsRef = useRef(albums);
+  const selectAlbumRef = useRef(selectAlbum);
+  useEffect(() => { loadFileRef.current = loadFile; }, [loadFile]);
+  useEffect(() => { albumsRef.current = albums; }, [albums]);
+  useEffect(() => { selectAlbumRef.current = selectAlbum; }, [selectAlbum]);
+
+  // Register file-open / virtual-image-open listeners exactly once.
   useEffect(() => {
     const electronAPI = getElectronAPI();
+    if (electronAPI?.onOpenFile) {
+      electronAPI.onOpenFile((filePath) => loadFileRef.current(filePath));
+    }
     if (electronAPI?.onOpenVirtualImage) {
       electronAPI.onOpenVirtualImage((data) => {
         console.log('[App] Received virtual image:', data);
@@ -245,12 +248,12 @@ function App() {
         const sourceImageId = data.source?.imageId || data.imageId;
 
         if (sourceAlbumId) {
-          // Check if album exists in our albums list
-          const targetAlbum = albums.find(a => a.id === sourceAlbumId);
+          // Check if album exists in our (latest) albums list
+          const targetAlbum = albumsRef.current.find(a => a.id === sourceAlbumId);
           if (targetAlbum) {
             console.log('[App] Found source album, jumping to:', targetAlbum.name);
             // Switch to album mode
-            selectAlbum(sourceAlbumId);
+            selectAlbumRef.current(sourceAlbumId);
             setViewMode('album');
             // Find the image index in the album
             const imgIndex = targetAlbum.images.findIndex(img => img.id === sourceImageId);
@@ -269,7 +272,7 @@ function App() {
         setViewMode('virtual');
       });
     }
-  }, [albums, selectAlbum]);
+  }, []);
 
   // Virtual image navigation
   const navigateVirtual = useCallback(async (newIndex) => {

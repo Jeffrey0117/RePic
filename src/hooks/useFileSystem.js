@@ -11,7 +11,6 @@ export const useFileSystem = () => {
     const [currentIndex, setCurrentIndex] = useState(-1);
     const [currentPath, setCurrentPath] = useState(null);
     const [currentMetadata, setCurrentMetadata] = useState(null);
-    const [thumbCache, setThumbCache] = useState({}); // Simple memory cache
     const [cacheVersion, setCacheVersion] = useState(0); // For cache busting after save
 
     // Initial Load - Try last folder first, fallback to desktop
@@ -76,17 +75,10 @@ export const useFileSystem = () => {
                 // Bump cache version to force image reload in Sidebar
                 if (preserveIndex) {
                     setCacheVersion(v => v + 1);
-                    setThumbCache({});
                 }
-
-                // Prefetch thumbnails (limited set for performance)
-                imageFiles.slice(0, 30).forEach(file => {
-                    const img = new Image();
-                    img.onload = () => {
-                        setThumbCache(prev => ({ ...prev, [file]: `${img.src}?t=${Date.now()}` }));
-                    };
-                    img.src = `file://${file}?t=${Date.now()}`;
-                });
+                // (Thumbnail prefetch removed: it wrote to a write-only cache that nothing
+                //  consumed and re-rendered the tree up to 30x per folder open. The Sidebar
+                //  loads its own thumbnails via batchThumbnailsStream.)
             } else {
                 setFiles([]);
                 setCurrentIndex(-1);

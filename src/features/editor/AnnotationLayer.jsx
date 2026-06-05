@@ -6,6 +6,13 @@ export const AnnotationLayer = ({ activeTool, onDrawEnd, imageRef }) => {
     const [isDrawing, setIsDrawing] = useState(false);
     const [startPos, setStartPos] = useState({ x: 0, y: 0 });
     const [annotations, setAnnotations] = useState([]);
+    const rafRef = useRef(0);
+    const lastPointRef = useRef({ x: 0, y: 0 });
+
+    // Cancel any pending redraw frame on unmount.
+    useEffect(() => () => {
+        if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    }, []);
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -20,8 +27,17 @@ export const AnnotationLayer = ({ activeTool, onDrawEnd, imageRef }) => {
         };
 
         resizeCanvas();
-        window.addEventListener('resize', resizeCanvas);
-        return () => window.removeEventListener('resize', resizeCanvas);
+        // Coalesce resize-driven redraws into one per frame.
+        let resizeRaf = 0;
+        const onResize = () => {
+            if (resizeRaf) return;
+            resizeRaf = requestAnimationFrame(() => { resizeRaf = 0; resizeCanvas(); });
+        };
+        window.addEventListener('resize', onResize);
+        return () => {
+            window.removeEventListener('resize', onResize);
+            if (resizeRaf) cancelAnimationFrame(resizeRaf);
+        };
     }, [imageRef.current]);
 
     const redraw = () => {
@@ -45,22 +61,30 @@ export const AnnotationLayer = ({ activeTool, onDrawEnd, imageRef }) => {
     const handleMouseMove = (e) => {
         if (!isDrawing || !activeTool) return;
         const rect = canvasRef.current.getBoundingClientRect();
-        const x = e.clientX - rect.left;
-        const y = e.clientY - rect.top;
+        lastPointRef.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
 
-        redraw();
-        const ctx = canvasRef.current.getContext('2d');
-        drawAnnotation(ctx, {
-            type: activeTool,
-            x: startPos.x,
-            y: startPos.y,
-            width: x - startPos.x,
-            height: y - startPos.y
+        // Coalesce high-frequency mousemove into a single redraw per animation frame.
+        if (rafRef.current) return;
+        rafRef.current = requestAnimationFrame(() => {
+            rafRef.current = 0;
+            redraw();
+            const ctx = canvasRef.current?.getContext('2d');
+            if (!ctx) return;
+            const { x, y } = lastPointRef.current;
+            drawAnnotation(ctx, {
+                type: activeTool,
+                x: startPos.x,
+                y: startPos.y,
+                width: x - startPos.x,
+                height: y - startPos.y
+            });
         });
     };
 
     const handleMouseUp = (e) => {
         if (!isDrawing || !activeTool) return;
+        // Drop any pending preview frame; we're committing the final annotation now.
+        if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = 0; }
         const rect = canvasRef.current.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
