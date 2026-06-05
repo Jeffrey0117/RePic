@@ -14,6 +14,56 @@ try {
     sharp = null;
 }
 
+const { Worker } = require('worker_threads');
+
+// Run the background-removal pixel scan on a worker thread so the main event loop
+// (and therefore all IPC) doesn't freeze while processing a large image. Self-contained
+// eval worker => no extra file to package. Falls back to inline processing on failure.
+function processBgPixelsInWorker(data) {
+    return new Promise((resolve, reject) => {
+        const workerCode = `
+            const { parentPort } = require('worker_threads');
+            parentPort.on('message', ({ buffer }) => {
+                const px = new Uint8ClampedArray(buffer);
+                for (let i = 0; i < px.length; i += 4) {
+                    const r = px[i], g = px[i + 1], b = px[i + 2];
+                    const brightness = (r + g + b) / 3;
+                    const saturation = Math.max(r, g, b) - Math.min(r, g, b);
+                    if (brightness > 200 && saturation < 30) px[i + 3] = 0;
+                }
+                parentPort.postMessage({ buffer }, [buffer]);
+            });
+        `;
+        const worker = new Worker(workerCode, { eval: true });
+        worker.once('message', ({ buffer }) => {
+            worker.terminate();
+            resolve(Buffer.from(buffer));
+        });
+        worker.once('error', (err) => {
+            worker.terminate();
+            reject(err);
+        });
+        // Copy into a standalone ArrayBuffer (sharp's Buffer may be pooled) and transfer it.
+        const ab = data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength);
+        worker.postMessage({ buffer: ab }, [ab]);
+    });
+}
+
+async function removeBgPixels(data) {
+    try {
+        return await processBgPixelsInWorker(data);
+    } catch (e) {
+        console.warn('[remove-bg] worker failed, processing inline:', e.message);
+        for (let i = 0; i < data.length; i += 4) {
+            const r = data[i], g = data[i + 1], b = data[i + 2];
+            const brightness = (r + g + b) / 3;
+            const saturation = Math.max(r, g, b) - Math.min(r, g, b);
+            if (brightness > 200 && saturation < 30) data[i + 3] = 0;
+        }
+        return data;
+    }
+}
+
 // Temp directory for drag & drop
 const TEMP_DIR = path.join(os.tmpdir(), 'repic-temp');
 const TEMP_EXPIRY_MS = 60 * 60 * 1000; // 1 hour
@@ -731,29 +781,12 @@ function setupIpcHandlers() {
                 .raw()
                 .toBuffer({ resolveWithObject: true });
 
-            // Process pixels to remove light gray/white background
-            // Using brightness + saturation algorithm
-            for (let i = 0; i < data.length; i += 4) {
-                const r = data[i];
-                const g = data[i + 1];
-                const b = data[i + 2];
-
-                // Check if pixel is light (brightness > 200)
-                const brightness = (r + g + b) / 3;
-
-                // Check if pixel is grayscale (low color variation)
-                const maxChannel = Math.max(r, g, b);
-                const minChannel = Math.min(r, g, b);
-                const saturation = maxChannel - minChannel;
-
-                // Remove if: bright AND low saturation (gray/white)
-                if (brightness > 200 && saturation < 30) {
-                    data[i + 3] = 0; // Set alpha to 0 (transparent)
-                }
-            }
+            // Process pixels to remove light gray/white background (brightness + saturation).
+            // Runs on a worker thread so the main event loop stays responsive on large images.
+            const processed = await removeBgPixels(data);
 
             // Create new PNG with transparency
-            const outputBuffer = await sharp(data, {
+            const outputBuffer = await sharp(processed, {
                 raw: {
                     width: info.width,
                     height: info.height,
