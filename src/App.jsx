@@ -2253,7 +2253,7 @@ function App() {
                   onContextMenu={(e) => handleImageContextMenu(e, albumImages[safeAlbumIndex], selectedAlbum)}
                 >
                   <div className="w-full h-full p-4">
-                    <ImageViewer src={currentAlbumImage} crop={albumImages[safeAlbumIndex]?.crop} annotations={albumImages[safeAlbumIndex]?.annotations} />
+                    <ImageViewer src={currentAlbumImage} crop={albumImages[safeAlbumIndex]?.crop} annotations={albumImages[safeAlbumIndex]?.annotations} hasTransparency={!!(albumImages[safeAlbumIndex]?.hasBackgroundRemoved || albumImages[safeAlbumIndex]?.processedUrl)} />
                   </div>
                 </motion.div>
               ) : (

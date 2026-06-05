@@ -7,7 +7,7 @@ import { hasImageTransparency, isPNGFormat } from '../../utils/imageUtils';
 
 const electronAPI = window.electronAPI || null;
 
-export const ImageViewer = ({ src, crop, annotations = [] }) => {
+export const ImageViewer = ({ src, crop, annotations = [], hasTransparency }) => {
     const { t } = useI18n();
     const containerRef = useRef(null);
     const imageRef = useRef(null);
@@ -156,6 +156,12 @@ export const ImageViewer = ({ src, crop, annotations = [] }) => {
     useEffect(() => {
         if (!imageSrc || loadFailed) return;
 
+        // If the caller already knows transparency (e.g. background-removed images),
+        // skip the expensive full-resolution decode + per-pixel alpha scan entirely
+        // (it otherwise janks the main thread for large base64 PNGs). The known value
+        // is applied directly at render time via `shouldShowCheckerboard` below.
+        if (typeof hasTransparency === 'boolean') return;
+
         // Only detect for PNG format images to save performance
         if (isPNGFormat(imageSrc)) {
             hasImageTransparency(imageSrc).then((hasAlpha) => {
@@ -164,7 +170,7 @@ export const ImageViewer = ({ src, crop, annotations = [] }) => {
         } else {
             setDetectedTransparency(false);
         }
-    }, [imageSrc, loadFailed]);
+    }, [imageSrc, loadFailed, hasTransparency]);
 
     // Sync refs whenever state changes
     useEffect(() => { scaleRef.current = scale; }, [scale]);
@@ -339,8 +345,10 @@ export const ImageViewer = ({ src, crop, annotations = [] }) => {
                 </div>
             ) : (
                 (() => {
-                    // Show checkerboard ONLY if transparency is actually detected
-                    const shouldShowCheckerboard = detectedTransparency;
+                    // Show checkerboard if the caller flagged transparency, else use detection.
+                    const shouldShowCheckerboard = typeof hasTransparency === 'boolean'
+                        ? hasTransparency
+                        : detectedTransparency;
 
                     return (
                         <div
@@ -366,6 +374,7 @@ export const ImageViewer = ({ src, crop, annotations = [] }) => {
                         ref={imageRef}
                         src={imageSrc}
                         alt="View"
+                        decoding="async"
                         className={`block select-none transition-opacity duration-150 ${isLoading ? 'opacity-0' : 'opacity-100'}`}
                         style={{
                             maxWidth: 'calc(100vw - 280px)',
