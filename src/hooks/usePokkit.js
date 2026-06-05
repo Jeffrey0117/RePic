@@ -81,13 +81,21 @@ export function usePokkit() {
       return
     }
 
-    // Map photos to include thumb/photo URLs
+    // Map photos to include thumb/photo URLs. Items may be photos or videos
+    // (media_type); videos get a streamable videoUrl and carry their duration.
     const albumData = result.data
-    const mappedPhotos = (albumData.photos || []).map(photo => ({
-      ...photo,
-      thumbUrl: api.getThumbUrl(photo.id),
-      photoUrl: api.getPhotoUrl(photo.id)
-    }))
+    const mappedPhotos = (albumData.photos || []).map(photo => {
+      const isVideo = photo.media_type === 'video'
+      return {
+        ...photo,
+        mediaType: photo.media_type || 'photo',
+        isVideo,
+        duration: photo.duration ?? null,
+        thumbUrl: api.getThumbUrl(photo.id),
+        photoUrl: api.getPhotoUrl(photo.id),
+        videoUrl: isVideo ? api.getVideoUrl(photo.id) : null
+      }
+    })
 
     setPhotos(mappedPhotos)
     setIsLoadingPhotos(false)

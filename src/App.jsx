@@ -2,6 +2,7 @@ import { useState, useEffect, lazy, Suspense, useCallback, useMemo, useRef } fro
 import { AnimatePresence, motion } from './lib/motion';
 import { Dropzone } from './features/viewer/Dropzone';
 import { ImageViewer } from './features/viewer/ImageViewer';
+import { VideoViewer } from './features/viewer/VideoViewer';
 import { Sidebar } from './components/ui/Sidebar';
 import { InfoPanel } from './components/ui/InfoPanel';
 import { TopBar } from './components/ui/TopBar';
@@ -2088,7 +2089,9 @@ function App() {
                   id: photo.id,
                   url: photo.thumbUrl,
                   src: photo.thumbUrl,
-                  name: photo.name || `Photo ${idx + 1}`
+                  name: photo.name || `Photo ${idx + 1}`,
+                  isVideo: photo.isVideo,
+                  duration: photo.duration
                 }))}
                 currentIndex={pokkitImageIndex}
                 onSelectImage={(index) => {
@@ -2201,7 +2204,15 @@ function App() {
                   }}
                 >
                   <div className="w-full h-full p-4">
-                    <ImageViewer src={pokkitPhotos[pokkitImageIndex].photoUrl} />
+                    {pokkitPhotos[pokkitImageIndex].isVideo ? (
+                      <VideoViewer
+                        src={pokkitPhotos[pokkitImageIndex].videoUrl}
+                        poster={pokkitPhotos[pokkitImageIndex].thumbUrl}
+                        processing={pokkitPhotos[pokkitImageIndex].status === 'processing'}
+                      />
+                    ) : (
+                      <ImageViewer src={pokkitPhotos[pokkitImageIndex].photoUrl} />
+                    )}
                   </div>
                 </motion.div>
               ) : (

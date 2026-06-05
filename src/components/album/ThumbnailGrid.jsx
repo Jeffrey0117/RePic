@@ -3,6 +3,15 @@ import { LazyImage } from '../ui/LazyImage';
 import { ContextMenu } from '../ui/ContextMenu';
 import { Scissors, Layers, Pencil } from '../icons';
 
+// Format a video duration in seconds as m:ss (e.g. 42 -> "0:42", 95 -> "1:35").
+const formatDuration = (seconds) => {
+  if (seconds == null || !isFinite(seconds)) return null;
+  const total = Math.round(seconds);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+};
+
 /**
  * ThumbnailGrid - Grid view for album images
  *
@@ -209,6 +218,24 @@ export const ThumbnailGrid = ({
                 showSpinner={true}
                 hasTransparency={image.hasBackgroundRemoved || !!image.processedUrl}
               />
+
+              {/* Video markers: center play triangle + bottom-right duration */}
+              {image.isVideo && (
+                <>
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className="w-12 h-12 rounded-full bg-black/45 backdrop-blur-sm flex items-center justify-center group-hover:bg-black/60 transition-colors">
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="white" className="ml-0.5">
+                        <path d="M8 5v14l11-7z" />
+                      </svg>
+                    </div>
+                  </div>
+                  {formatDuration(image.duration) && (
+                    <div className="absolute bottom-2 right-2 bg-black/70 text-white text-[11px] font-medium px-1.5 py-0.5 rounded pointer-events-none tabular-nums">
+                      {formatDuration(image.duration)}
+                    </div>
+                  )}
+                </>
+              )}
 
               {/* Multi-select checkbox */}
               {isMultiSelectMode && (

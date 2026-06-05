@@ -52,6 +52,11 @@ export function createPokkitApi(token) {
 
     getThumbUrl(photoId) {
       return `${BASE_URL}/photos/${photoId}/thumb.webp`
+    },
+
+    // Video stream (public route, supports HTTP Range — no auth header needed).
+    getVideoUrl(photoId) {
+      return `${BASE_URL}/photos/${photoId}/video.mp4`
     }
   }
 }
