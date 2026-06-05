@@ -330,10 +330,13 @@ export const Sidebar = ({
 
             if (needThumbs.length === 0) return;
 
-            // Sort by priority: closest to currentIndex first
+            // Sort by priority: closest to currentIndex first.
+            // Precompute file->index once (O(n)) so the comparator is O(1) instead of
+            // calling files.indexOf() twice per comparison (O(n^2 log n) overall).
+            const indexMap = new Map(files.map((f, i) => [f, i]));
             const sortedFiles = [...needThumbs].sort((a, b) => {
-                const idxA = files.indexOf(a);
-                const idxB = files.indexOf(b);
+                const idxA = indexMap.get(a);
+                const idxB = indexMap.get(b);
                 return Math.abs(idxA - currentIndex) - Math.abs(idxB - currentIndex);
             });
 

@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import ReactCrop from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 import { Button } from '../../components/ui/Button';
@@ -72,25 +72,50 @@ export const ImageEditor = ({
     estimateCompressedSize(85);
   };
 
-  // Estimate compressed size
+  // Estimate compressed size on a downsampled proxy (longest edge <= 400px), then
+  // scale the result back up by the pixel-area ratio. JPEG byte size scales roughly
+  // linearly with pixel count at a fixed quality, so this is a fast, good-enough
+  // estimate that avoids re-encoding the full-resolution image on every slider tick.
   const estimateCompressedSize = useCallback((q) => {
-    if (!imgRef.current) return;
+    const img = imgRef.current;
+    if (!img) return;
+    const fullW = img.naturalWidth;
+    const fullH = img.naturalHeight;
+    if (!fullW || !fullH) return;
+
+    const MAX_EDGE = 400;
+    const scale = Math.min(1, MAX_EDGE / Math.max(fullW, fullH));
+    const proxyW = Math.max(1, Math.round(fullW * scale));
+    const proxyH = Math.max(1, Math.round(fullH * scale));
+
     const canvas = document.createElement('canvas');
+    canvas.width = proxyW;
+    canvas.height = proxyH;
     const ctx = canvas.getContext('2d');
-    canvas.width = imgRef.current.naturalWidth;
-    canvas.height = imgRef.current.naturalHeight;
-    ctx.drawImage(imgRef.current, 0, 0);
+    ctx.drawImage(img, 0, 0, proxyW, proxyH);
     canvas.toBlob((blob) => {
       if (blob) {
-        setEstimatedSize(blob.size);
+        const areaRatio = (fullW * fullH) / (proxyW * proxyH);
+        setEstimatedSize(Math.round(blob.size * areaRatio));
       }
     }, 'image/jpeg', q / 100);
+  }, []);
+
+  // Debounce slider-driven estimates so dragging doesn't queue an encode per tick.
+  const estimateTimer = useRef(null);
+  const debouncedEstimate = useCallback((q) => {
+    if (estimateTimer.current) clearTimeout(estimateTimer.current);
+    estimateTimer.current = setTimeout(() => estimateCompressedSize(q), 150);
+  }, [estimateCompressedSize]);
+
+  useEffect(() => () => {
+    if (estimateTimer.current) clearTimeout(estimateTimer.current);
   }, []);
 
   const handleQualityChange = (e) => {
     const q = parseInt(e.target.value);
     setQuality(q);
-    estimateCompressedSize(q);
+    debouncedEstimate(q);
   };
 
   // Handle background removal

@@ -533,7 +533,7 @@ function setupIpcHandlers() {
                 return { success: false, error: 'Invalid base64 content' };
             }
             const buffer = Buffer.from(base64Content, 'base64');
-            fs.writeFileSync(filePath, buffer);
+            await fs.promises.writeFile(filePath, buffer);
             return { success: true };
         } catch (e) {
             console.error("Failed to save file", e);
@@ -663,7 +663,7 @@ function setupIpcHandlers() {
         }
         try {
             const content = JSON.stringify(data, null, 2);
-            fs.writeFileSync(filePath, content, 'utf-8');
+            await fs.promises.writeFile(filePath, content, 'utf-8');
             return { success: true };
         } catch (e) {
             console.error('Failed to write .repic file:', e);
@@ -686,7 +686,7 @@ function setupIpcHandlers() {
             for (const file of files) {
                 const filePath = path.join(folderPath, file.filename);
                 const content = JSON.stringify(file.data, null, 2);
-                fs.writeFileSync(filePath, content, 'utf-8');
+                await fs.promises.writeFile(filePath, content, 'utf-8');
                 results.push({ filename: file.filename, success: true });
             }
             return { success: true, count: results.length };
@@ -791,7 +791,7 @@ function setupIpcHandlers() {
                 const ext = imageSrc.includes('png') ? '.png' : '.jpg';
                 const tempPath = path.join(TEMP_DIR, `drag-${Date.now()}${ext}`);
                 const base64Content = imageSrc.split(',')[1];
-                fs.writeFileSync(tempPath, Buffer.from(base64Content, 'base64'));
+                await fs.promises.writeFile(tempPath, Buffer.from(base64Content, 'base64'));
                 filePath = tempPath;
             } else {
                 return { success: false, error: 'Unsupported image source' };
@@ -1574,7 +1574,7 @@ function setupIpcHandlers() {
                 return { success: false, error: 'Invalid base64 content' };
             }
             const buffer = Buffer.from(base64Content, 'base64');
-            fs.writeFileSync(targetPath, buffer);
+            await fs.promises.writeFile(targetPath, buffer);
             console.log('[batch-crop-save] Success!');
             return { success: true, path: targetPath };
         } catch (e) {
