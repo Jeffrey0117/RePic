@@ -28,7 +28,8 @@
       {
         "provider": "github",
         "owner": "Jeffrey0117",
-        "repo": "RePic"
+        "repo": "RePic",
+        "releaseType": "release"
       }
     ],
     "asarUnpack": [
