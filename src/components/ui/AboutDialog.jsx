@@ -65,6 +65,23 @@ export const AboutDialog = memo(({ isOpen, onClose }) => {
               {t('aboutDescription') || '快速、輕量的圖片管理工具。支援本地圖片瀏覽、網頁圖片收藏、基礎編輯等功能。'}
             </p>
 
+            {/* Set as default image viewer (Windows can't auto-default; deep-link to settings) */}
+            {window.electronAPI?.openDefaultAppsSettings && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  window.electronAPI.openDefaultAppsSettings();
+                }}
+                className={`mb-6 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  isDark
+                    ? 'bg-white/10 text-white/80 hover:bg-white/15'
+                    : 'bg-black/5 text-gray-700 hover:bg-black/10'
+                }`}
+              >
+                {t('setAsDefaultViewer') || '設為預設圖片檢視器'}
+              </button>
+            )}
+
             {/* Links */}
             <div className="flex justify-center gap-4 mb-6">
               <a

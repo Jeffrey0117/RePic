@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, ipcMain, dialog, nativeImage, session } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, dialog, nativeImage, session, shell } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
@@ -719,6 +719,18 @@ function setupIpcHandlers() {
     ipcMain.handle('native-available', () => {
         const scraperPath = getScraperPath();
         return { available: fs.existsSync(scraperPath) };
+    });
+
+    // Open Windows "Default apps" settings. Windows 10/11 forbids an app from
+    // force-setting itself as the default handler, so we deep-link the user there
+    // (RePic is already registered as an available handler via fileAssociations).
+    ipcMain.handle('open-default-apps-settings', async () => {
+        try {
+            await shell.openExternal('ms-settings:defaultapps');
+            return { success: true };
+        } catch (e) {
+            return { success: false, error: e.message };
+        }
     });
 
     // Read .repic file
@@ -1737,6 +1749,12 @@ function setupIpcHandlers() {
 }
 
 app.whenReady().then(() => {
+    // Windows: make the taskbar grouping, jump list and notifications show "Repic"
+    // instead of "Electron". Must match the NSIS appId. No-op on other platforms.
+    if (process.platform === 'win32') {
+        app.setAppUserModelId('com.repic.app');
+    }
+
     // Get file from command line (for file association)
     fileToOpen = getFileFromArgs();
 

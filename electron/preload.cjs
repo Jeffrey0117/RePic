@@ -288,6 +288,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
         return await ipcRenderer.invoke('get-always-on-top');
     },
 
+    // Open Windows "Default apps" settings so the user can set RePic as default.
+    openDefaultAppsSettings: async () => {
+        return await ipcRenderer.invoke('open-default-apps-settings');
+    },
+
     // Scrape images from webpage URL
     scrapeImages: async (url) => {
         if (!url || typeof url !== 'string' || !url.startsWith('http')) {
