@@ -1,7 +1,7 @@
 {
   "name": "repic",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "RePic — desktop image viewer/manager with zero-KB virtual albums",
   "author": "Jeffrey0117",
   "type": "module",
