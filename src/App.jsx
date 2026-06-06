@@ -84,7 +84,8 @@ function App() {
     login: pokkitLogin,
     logout: pokkitLogout,
     selectAlbum: pokkitSelectAlbum,
-    refreshAlbums: pokkitRefreshAlbums
+    refreshAlbums: pokkitRefreshAlbums,
+    uploadPhoto: pokkitUploadPhoto
   } = usePokkit();
 
   // Pokkit image navigation state
@@ -1633,7 +1634,22 @@ function App() {
       const ext = uploadBlob.type === 'image/png' ? 'png' : (uploadBlob.type.split('/')[1] || 'png');
 
       const hash = await sha256(uploadBlob);
-      const { url } = await uploadToUrusai(uploadBlob, `repic-${Date.now()}.${ext}`);
+
+      // Logged into pokkit → upload to your account (login-gated, no anonymous burden);
+      // otherwise fall back to urusai (anonymous, zero-config).
+      const uploadName = `repic-${Date.now()}.${ext}`;
+      let url;
+      let backend;
+      if (pokkitAuth && pokkitUploadPhoto) {
+        const res = await pokkitUploadPhoto(uploadBlob, uploadName);
+        if (!res?.success || !res.url) throw new Error(res?.error || 'pokkit upload failed');
+        url = res.url;
+        backend = 'pokkit';
+      } else {
+        const res = await uploadToUrusai(uploadBlob, uploadName);
+        url = res.url;
+        backend = 'urusai';
+      }
 
       const origExt = electronAPI.path.extname(currentImage);
       const base = electronAPI.path.basename(currentImage, origExt);
@@ -1641,7 +1657,7 @@ function App() {
         mime: uploadBlob.type,
         hash,
         size: uploadBlob.size,
-        backend: 'urusai'
+        backend
       });
 
       const repicPath = electronAPI.path.join(electronAPI.path.dirname(currentImage), `${base}.repic`);

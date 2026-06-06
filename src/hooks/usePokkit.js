@@ -101,6 +101,20 @@ export function usePokkit() {
     setIsLoadingPhotos(false)
   }, [api, handleUnauthorized])
 
+  // Upload a local file (image/video) to the user's pokkit account. Requires login.
+  // Returns { success, url, id } — url is the public pokkit photo URL for the entry.
+  const uploadPhoto = useCallback(async (blob, filename) => {
+    if (!api) return { success: false, error: 'not authenticated' }
+    const result = await api.uploadFile(blob, filename)
+    if (!result.success) {
+      if (result.error === 'unauthorized') handleUnauthorized()
+      return result
+    }
+    const id = result.data?.id
+    if (!id) return { success: false, error: 'no id in upload response' }
+    return { success: true, id, url: api.getPhotoUrl(id) }
+  }, [api, handleUnauthorized])
+
   // Selected album object
   const selectedAlbum = useMemo(
     () => albums.find(a => a.id === selectedAlbumId) || null,
@@ -128,6 +142,7 @@ export function usePokkit() {
     // Actions
     selectAlbum,
     refreshAlbums,
+    uploadPhoto,
 
     // Error
     error

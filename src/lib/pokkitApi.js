@@ -57,6 +57,32 @@ export function createPokkitApi(token) {
     // Video stream (public route, supports HTTP Range — no auth header needed).
     getVideoUrl(photoId) {
       return `${BASE_URL}/photos/${photoId}/video.mp4`
+    },
+
+    // Upload a file (image or video) to the authenticated user's pokkit account.
+    // Multipart field "file"; auth via the Bearer token. Returns { success, data:{ id, ... } }.
+    async uploadFile(blob, filename) {
+      const form = new FormData()
+      form.append('file', blob, filename)
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 120000) // videos can be large
+      try {
+        const response = await fetch(`${BASE_URL}/upload`, {
+          method: 'POST',
+          // No Content-Type — let fetch set the multipart boundary. Only auth here.
+          headers: { 'Authorization': `Bearer ${token}` },
+          body: form,
+          signal: controller.signal
+        })
+        clearTimeout(timeout)
+        if (response.status === 401) return { success: false, error: 'unauthorized' }
+        if (!response.ok) return { success: false, error: `HTTP ${response.status}` }
+        const data = await response.json()
+        return { success: true, data }
+      } catch (error) {
+        clearTimeout(timeout)
+        return { success: false, error: error.name === 'AbortError' ? 'timeout' : error.message }
+      }
     }
   }
 }
