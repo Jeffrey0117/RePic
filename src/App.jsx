@@ -14,7 +14,8 @@ import { ConfirmDialog } from './components/ui/ConfirmDialog';
 import { AboutDialog } from './components/ui/AboutDialog';
 import { ContextMenu } from './components/ui/ContextMenu';
 import { Copy, Download, FolderOutput, Trash2, Pencil, Grid3x3, Album as AlbumIcon } from './components/icons';
-import { prepareSingleExport } from './utils/repicFile';
+import { prepareSingleExport, createRepicData } from './utils/repicFile';
+import { imageSrcToBlob, toPngIfWebp, sha256, uploadToUrusai } from './utils/upload';
 import { AlbumSidebar } from './features/album/AlbumSidebar';
 import { PokkitSidebar } from './features/pokkit/PokkitSidebar';
 import { ThumbnailGrid } from './components/album/ThumbnailGrid';
@@ -112,6 +113,7 @@ function App() {
 
   // Upload state
   const [isUploading, setIsUploading] = useState(false);
+  const [isVirtualizing, setIsVirtualizing] = useState(false);
   const [uploadHistory, setUploadHistory] = useState([]);
   const [showUploadHistory, setShowUploadHistory] = useState(false);
 
@@ -1614,6 +1616,48 @@ function App() {
     }
   };
 
+  // One-click virtualize a local image: upload to urusai (the u-host), then write a
+  // refile-v2 .repic pointer (url + mime + sha256 + size) next to the original. The
+  // original file is kept — turning a local image into a portable, zero-KB shortcut.
+  const handleVirtualize = async () => {
+    const electronAPI = getElectronAPI();
+    if (!electronAPI || !currentImage || !localImage) {
+      setToast({ visible: true, message: t('noImageToUpload') });
+      return;
+    }
+    setIsVirtualizing(true);
+    try {
+      const blob = await imageSrcToBlob(localImage, electronAPI);
+      if (!blob) throw new Error('Failed to read image');
+      const uploadBlob = await toPngIfWebp(blob);
+      const ext = uploadBlob.type === 'image/png' ? 'png' : (uploadBlob.type.split('/')[1] || 'png');
+
+      const hash = await sha256(uploadBlob);
+      const { url } = await uploadToUrusai(uploadBlob, `repic-${Date.now()}.${ext}`);
+
+      const origExt = electronAPI.path.extname(currentImage);
+      const base = electronAPI.path.basename(currentImage, origExt);
+      const data = createRepicData(url, base, {
+        mime: uploadBlob.type,
+        hash,
+        size: uploadBlob.size,
+        backend: 'urusai'
+      });
+
+      const repicPath = electronAPI.path.join(electronAPI.path.dirname(currentImage), `${base}.repic`);
+      const result = await electronAPI.writeRepicFile(repicPath, data);
+      if (!result?.success) throw new Error(result?.error || 'Failed to write .repic');
+
+      setToast({ visible: true, message: t('virtualizeSuccess', { name: `${base}.repic` }) || `已虛擬化 → ${base}.repic` });
+      if (currentPath) loadFolder(currentPath, true); // refresh so the new .repic appears
+    } catch (error) {
+      console.error('[handleVirtualize] Error:', error);
+      setToast({ visible: true, message: t('virtualizeFailed', { error: error.message }) || `虛擬化失敗: ${error.message}` });
+    } finally {
+      setIsVirtualizing(false);
+    }
+  };
+
   // Keyboard Navigation
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -1943,6 +1987,8 @@ function App() {
         isCopying={isCopying}
         onUpload={handleUpload}
         isUploading={isUploading}
+        onVirtualize={handleVirtualize}
+        isVirtualizing={isVirtualizing}
         onToggleUploadHistory={() => setShowUploadHistory(!showUploadHistory)}
         uploadHistoryCount={uploadHistory.length}
         onExportVirtual={() => setShowExportDialog(true)}

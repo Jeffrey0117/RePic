@@ -27,7 +27,11 @@ export function createRepicData(url, name, options = {}) {
     imageId = null,
     crop = null,
     annotations = null,
-    original = null
+    original = null,
+    mime = null,
+    hash = null,
+    size = null,
+    backend = null
   } = options;
 
   const data = {
@@ -37,6 +41,14 @@ export function createRepicData(url, name, options = {}) {
     name: name || extractNameFromUrl(url),
     createdAt: Date.now()
   };
+
+  // Canonical refile-v2 fields (shared format wall). Present when the pointer was created
+  // by virtualizing a real file (RePic one-click virtualize); MemoryGuy's registry/format
+  // treats these as required for a virtual-image. Omitted for the lighter album export.
+  if (mime) data.mime = mime;
+  if (hash) data.hash = hash;
+  if (typeof size === 'number') data.size = size;
+  if (backend) data.backend = backend;
 
   // Include crop if present
   if (crop) {

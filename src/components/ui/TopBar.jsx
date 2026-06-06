@@ -7,7 +7,8 @@ import {
     Globe,
     Sun,
     Moon,
-    Album
+    Album,
+    Database
 } from '../icons';
 import { Button } from './Button';
 import useI18n from '../../hooks/useI18n';
@@ -202,6 +203,8 @@ export const TopBar = ({
     isCopying,
     onUpload,
     isUploading,
+    onVirtualize,
+    isVirtualizing,
     onToggleUploadHistory,
     uploadHistoryCount,
     onExportVirtual,
@@ -441,6 +444,14 @@ export const TopBar = ({
                     onClick={onUpload}
                     disabled={isUploading || viewMode === 'album'}
                     loading={isUploading}
+                    theme={theme}
+                />
+                <ToolbarButton
+                    icon={Database}
+                    title={t('virtualize') || '虛擬化 → .repic'}
+                    onClick={onVirtualize}
+                    disabled={isVirtualizing || viewMode !== 'local' || !hasImage}
+                    loading={isVirtualizing}
                     theme={theme}
                 />
                 <ToolbarButton
