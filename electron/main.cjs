@@ -372,6 +372,63 @@ function downloadToTemp(url) {
     });
 }
 
+// --- .repic embedded thumbnails ---------------------------------------------
+// A .repic is a JSON pointer, so Windows Explorer shows the generic app icon for
+// every one. Embedding a tiny JPEG under the `thumb` key lets our shell thumbnail
+// handler (shell/repic-thumbs) render the actual image — offline, no per-view
+// network I/O. All helpers are best-effort: on any failure they return null so
+// the pointer is still written (Explorer just falls back to the icon).
+const REPIC_THUMB_MAX = 256; // longest edge in px; JPEG q70 ≈ a few KB
+
+async function makeRepicThumb(inputBuffer) {
+    if (!sharp || !inputBuffer) return null;
+    try {
+        const out = await sharp(inputBuffer)
+            .rotate() // honor EXIF orientation
+            .resize(REPIC_THUMB_MAX, REPIC_THUMB_MAX, { fit: 'inside', withoutEnlargement: true })
+            .jpeg({ quality: 70 })
+            .toBuffer();
+        return `data:image/jpeg;base64,${out.toString('base64')}`;
+    } catch (e) {
+        console.error('[repic-thumb] generation failed:', e.message);
+        return null;
+    }
+}
+
+async function makeRepicThumbFromUrl(url) {
+    if (!sharp || !url || !/^https?:/i.test(url)) return null;
+    try {
+        const tempPath = await downloadToTemp(url);
+        const buf = await fs.promises.readFile(tempPath);
+        return await makeRepicThumb(buf);
+    } catch (e) {
+        console.error('[repic-thumb] url thumb failed:', url?.slice(0, 80), e.message);
+        return null;
+    }
+}
+
+// Return a new data object with an embedded thumb, or the original if we can't make one.
+async function withEmbeddedThumb(data) {
+    if (!data || data.thumb || !data.url) return data;
+    const thumb = await makeRepicThumbFromUrl(data.url);
+    return thumb ? { ...data, thumb } : data;
+}
+
+// Run an async mapper over items with bounded concurrency (order-preserving).
+async function mapLimit(items, limit, mapper) {
+    const results = new Array(items.length);
+    let next = 0;
+    async function worker() {
+        while (next < items.length) {
+            const i = next++;
+            results[i] = await mapper(items[i], i);
+        }
+    }
+    const workers = Array.from({ length: Math.min(limit, items.length) }, worker);
+    await Promise.all(workers);
+    return results;
+}
+
 // Browser proxy queue - only one hidden window at a time to avoid rate limiting
 const browserProxyQueue = [];
 let browserProxyActive = false;
@@ -754,7 +811,8 @@ function setupIpcHandlers() {
             return { success: false, error: 'Invalid file path' };
         }
         try {
-            const content = JSON.stringify(data, null, 2);
+            const finalData = await withEmbeddedThumb(data);
+            const content = JSON.stringify(finalData, null, 2);
             await fs.promises.writeFile(filePath, content, 'utf-8');
             return { success: true };
         } catch (e) {
@@ -774,12 +832,16 @@ function setupIpcHandlers() {
                 fs.mkdirSync(folderPath, { recursive: true });
             }
 
+            // Embed thumbnails with bounded concurrency so Explorer shows the real
+            // image. downloadToTemp caches, so re-exports of the same album are fast.
+            const dataWithThumbs = await mapLimit(files, 8, (file) => withEmbeddedThumb(file.data));
+
             const results = [];
-            for (const file of files) {
-                const filePath = path.join(folderPath, file.filename);
-                const content = JSON.stringify(file.data, null, 2);
+            for (let i = 0; i < files.length; i++) {
+                const filePath = path.join(folderPath, files[i].filename);
+                const content = JSON.stringify(dataWithThumbs[i], null, 2);
                 await fs.promises.writeFile(filePath, content, 'utf-8');
-                results.push({ filename: file.filename, success: true });
+                results.push({ filename: files[i].filename, success: true });
             }
             return { success: true, count: results.length };
         } catch (e) {
