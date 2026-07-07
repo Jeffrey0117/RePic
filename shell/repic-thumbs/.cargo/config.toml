@@ -1,0 +1,5 @@
+# Statically link the MSVC CRT so the thumbnail DLL has no VCRUNTIME140.dll /
+# UCRT external dependency. This lets it load cleanly in Explorer's thumbnail
+# surrogate on any machine without the VC++ redistributable installed.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

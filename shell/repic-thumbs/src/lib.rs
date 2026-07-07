@@ -33,6 +33,31 @@ const CLSID_REPIC_THUMB: GUID = GUID::from_u128(0x7E3D9A1C_2B4F_4C6E_9F80_1A2B3C
 /// Shell subkey under a file class that names an `IThumbnailProvider` handler.
 const SHELLEX_THUMB_GUID: &str = "{e357fccd-a995-4576-b01f-234630154e96}";
 
+/// Diagnostic log toggle. Gated on a marker FILE (not an env var) because
+/// Explorer's thumbnail surrogate is spawned by DCOM and doesn't inherit the
+/// user's environment. When `%LOCALAPPDATA%\RePic\THUMB_LOG_ENABLE` exists, key
+/// handler events are appended to `%LOCALAPPDATA%\RePic\thumbs.log`, so we can
+/// tell whether the surrogate actually invokes us. No-op otherwise.
+fn repic_dir() -> Option<std::path::PathBuf> {
+    std::env::var_os("LOCALAPPDATA").map(|local| {
+        let mut p = std::path::PathBuf::from(local);
+        p.push("RePic");
+        p
+    })
+}
+
+fn log_line(msg: &str) {
+    let Some(dir) = repic_dir() else { return };
+    if !dir.join("THUMB_LOG_ENABLE").exists() {
+        return;
+    }
+    let path = dir.join("thumbs.log");
+    if let Ok(mut f) = std::fs::OpenOptions::new().create(true).append(true).open(&path) {
+        use std::io::Write as _;
+        let _ = writeln!(f, "[pid {}] {}", std::process::id(), msg);
+    }
+}
+
 /// Number of live COM objects + server locks; gates `DllCanUnloadNow`.
 static DLL_REF_COUNT: AtomicIsize = AtomicIsize::new(0);
 /// Our own HINSTANCE, captured in `DllMain`, used to resolve the DLL path.
@@ -64,6 +89,7 @@ impl Drop for RepicThumbProvider {
 
 impl IInitializeWithStream_Impl for RepicThumbProvider_Impl {
     fn Initialize(&self, pstream: Option<&IStream>, _grfmode: u32) -> Result<()> {
+        log_line("IInitializeWithStream::Initialize called");
         let stream = pstream.ok_or_else(|| Error::from(E_POINTER))?;
         *self.stream.borrow_mut() = Some(stream.clone());
         Ok(())
@@ -77,6 +103,7 @@ impl IThumbnailProvider_Impl for RepicThumbProvider_Impl {
         phbmp: *mut HBITMAP,
         pdwalpha: *mut WTS_ALPHATYPE,
     ) -> Result<()> {
+        log_line(&format!("GetThumbnail called (cx={})", cx));
         let stream = self
             .stream
             .borrow()
@@ -84,15 +111,29 @@ impl IThumbnailProvider_Impl for RepicThumbProvider_Impl {
             .ok_or_else(|| Error::from(E_UNEXPECTED))?;
 
         let json_bytes = read_stream_to_end(&stream)?;
+        log_line(&format!("read {} bytes from stream", json_bytes.len()));
         // Normally the pixels come from the embedded `thumb`. If that's missing or
         // the file isn't JSON at all (e.g. a real image mislabeled `.repic`), fall
         // back to decoding the whole file as an image. If neither is decodable,
         // decode_to_hbitmap errors and the shell shows the registered icon.
         let img_bytes = match extract_embedded_thumb(&json_bytes) {
-            Ok(bytes) => bytes,
-            Err(_) => json_bytes,
+            Ok(bytes) => {
+                log_line(&format!("extracted embedded thumb ({} bytes)", bytes.len()));
+                bytes
+            }
+            Err(_) => {
+                log_line("no embedded thumb; trying whole file as image");
+                json_bytes
+            }
         };
-        let hbmp = decode_to_hbitmap(&img_bytes, cx)?;
+        let hbmp = match decode_to_hbitmap(&img_bytes, cx) {
+            Ok(h) => h,
+            Err(e) => {
+                log_line(&format!("decode failed: {:?}", e.code()));
+                return Err(e);
+            }
+        };
+        log_line("decoded ok, returning HBITMAP");
 
         unsafe {
             *phbmp = hbmp;
@@ -291,6 +332,7 @@ extern "system" fn DllGetClassObject(
     riid: *const GUID,
     ppv: *mut *mut c_void,
 ) -> HRESULT {
+    log_line("DllGetClassObject called");
     unsafe {
         if *rclsid != CLSID_REPIC_THUMB {
             return CLASS_E_CLASSNOTAVAILABLE;

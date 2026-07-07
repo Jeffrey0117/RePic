@@ -40,10 +40,18 @@ fn main() -> Result<()> {
         let factory: IShellItemImageFactory =
             SHCreateItemFromParsingName(PCWSTR(input_w.as_ptr()), None)?;
 
+        // 3rd arg selects the flag so we can compare Explorer's *default* decision
+        // (thumbnail-or-icon) against a forced thumbnail.
+        let mode = args.get(3).map(|s| s.as_str()).unwrap_or("default");
+        let flags = match mode {
+            "thumb" => SIIGBF_THUMBNAILONLY,
+            "icon" => SIIGBF_ICONONLY,
+            _ => SIIGBF(0), // Explorer's normal path: shell decides thumbnail vs icon
+        };
+        println!("mode: {} (flags={:?})", mode, flags.0);
+
         let size = SIZE { cx: 256, cy: 256 };
-        // THUMBNAILONLY forces the shell to use a thumbnail handler (no icon fallback),
-        // so a success here proves our handler produced the bitmap.
-        let hbmp: HBITMAP = factory.GetImage(size, SIIGBF_THUMBNAILONLY)?;
+        let hbmp: HBITMAP = factory.GetImage(size, flags)?;
         println!("GetImage returned HBITMAP: {:?}", hbmp);
 
         save_hbitmap_png(hbmp, output)?;
