@@ -168,21 +168,33 @@ function cleanupTempFiles() {
 // (scraped) URLs here — without this, a crafted URL could make the app fetch
 // loopback/LAN/cloud-metadata endpoints and hand the body to the renderer.
 // DNS-rebinding is out of scope (no resolution here); this guards literals.
+function isPrivateIPv4(host) {
+    const m = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+    if (!m) return false;
+    const a = Number(m[1]);
+    const b = Number(m[2]);
+    if (a === 0 || a === 10 || a === 127) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 169 && b === 254) return true;
+    return false;
+}
+
 function isSafeRemoteUrl(rawUrl) {
     try {
         const u = new URL(rawUrl);
         if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
         const host = u.hostname.toLowerCase();
-        if (host === 'localhost' || host === '::1' || host === '[::1]') return false;
-        const m = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
-        if (m) {
-            const a = Number(m[1]);
-            const b = Number(m[2]);
-            if (a === 0 || a === 10 || a === 127) return false;
-            if (a === 192 && b === 168) return false;
-            if (a === 172 && b >= 16 && b <= 31) return false;
-            if (a === 169 && b === 254) return false;
-        }
+        if (host === 'localhost') return false;
+
+        // Block every bracketed IPv6 literal. Cloud metadata and loopback are
+        // reachable via IPv4-mapped IPv6 (::ffff:169.254.169.254), which
+        // WHATWG canonicalizes to an opaque hex form (::ffff:a9fe:a9fe) that's
+        // impractical to classify here — and real image hosts never use bare
+        // IPv6 literals, so a blanket block is safe and honest.
+        if (host.startsWith('[')) return false;
+
+        if (isPrivateIPv4(host)) return false;
         return true;
     } catch (e) {
         return false;

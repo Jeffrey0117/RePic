@@ -161,6 +161,7 @@
   "refreshed": "已重整",
   "imageReloaded": "圖片已重新載入",
   "albumsLoadFailed": "相簿資料讀取失敗，已備份原始資料",
+  "exportFailedCount": "個失敗",
   "importSuccess": "匯入成功",
   "importFailed": "匯入失敗",
   "removeBackground": "一鍵去背",

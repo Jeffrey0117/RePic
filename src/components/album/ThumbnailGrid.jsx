@@ -1,16 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
-import { LazyImage } from '../ui/LazyImage';
+import { useState, useRef, useEffect, useCallback, memo } from 'react';
 import { ContextMenu } from '../ui/ContextMenu';
-import { Scissors, Layers, Pencil } from '../icons';
-
-// Format a video duration in seconds as m:ss (e.g. 42 -> "0:42", 95 -> "1:35").
-const formatDuration = (seconds) => {
-  if (seconds == null || !isFinite(seconds)) return null;
-  const total = Math.round(seconds);
-  const m = Math.floor(total / 60);
-  const s = total % 60;
-  return `${m}:${String(s).padStart(2, '0')}`;
-};
+import { Scissors, Pencil } from '../icons';
+import { ThumbnailGridCell } from './ThumbnailGridCell';
 
 /**
  * ThumbnailGrid - Grid view for album images
@@ -26,7 +17,7 @@ const formatDuration = (seconds) => {
  * @param {Function} onRemoveBackground - Callback for removing background from image(s)
  * @param {Function} onRenameImage - Callback for renaming image (imageId, newName)
  */
-export const ThumbnailGrid = ({
+export const ThumbnailGrid = memo(function ThumbnailGrid({
   images,
   currentIndex,
   onSelectImage,
@@ -37,7 +28,7 @@ export const ThumbnailGrid = ({
   onToggleSelect,
   onRemoveBackground,
   onRenameImage
-}) => {
+}) {
   // Grid sizes (in pixels)
   const sizes = {
     small: 128,
@@ -54,10 +45,18 @@ export const ThumbnailGrid = ({
     targetIndex: null
   });
 
-  // Rename state
+  // Rename state. renameValueRef mirrors renameValue so the submit callback
+  // can read the latest text without depending on it (keeps the callback
+  // stable, so memoized cells don't re-render on every keystroke).
   const [renamingImageId, setRenamingImageId] = useState(null);
   const [renameValue, setRenameValue] = useState('');
+  const renameValueRef = useRef('');
   const renameInputRef = useRef(null);
+
+  const handleRenameChange = useCallback((val) => {
+    renameValueRef.current = val;
+    setRenameValue(val);
+  }, []);
 
   // Focus and select rename input when renaming starts
   useEffect(() => {
@@ -68,7 +67,7 @@ export const ThumbnailGrid = ({
   }, [renamingImageId]);
 
   // Handle right-click on thumbnail
-  const handleContextMenu = (e, image, index) => {
+  const handleContextMenu = useCallback((e, image, index) => {
     e.preventDefault();
     e.stopPropagation();
 
@@ -78,7 +77,7 @@ export const ThumbnailGrid = ({
       targetImage: image,
       targetIndex: index
     });
-  };
+  }, []);
 
   // Close context menu
   const closeContextMenu = () => {
@@ -108,33 +107,38 @@ export const ThumbnailGrid = ({
       const currentName = contextMenu.targetImage.name ||
         `${contextMenu.targetIndex + 1}.jpg`;
       setRenamingImageId(contextMenu.targetImage.id);
+      renameValueRef.current = currentName;
       setRenameValue(currentName);
       closeContextMenu();
     }
   };
 
   // Handle rename submit
-  const handleRenameSubmit = () => {
-    if (renamingImageId && renameValue.trim() && onRenameImage) {
-      onRenameImage(renamingImageId, renameValue.trim());
-    }
-    setRenamingImageId(null);
+  const handleRenameSubmit = useCallback(() => {
+    const val = renameValueRef.current;
+    setRenamingImageId((id) => {
+      if (id && val.trim() && onRenameImage) onRenameImage(id, val.trim());
+      return null;
+    });
+    renameValueRef.current = '';
     setRenameValue('');
-  };
+  }, [onRenameImage]);
 
   // Handle rename cancel
-  const handleRenameCancel = () => {
+  const handleRenameCancel = useCallback(() => {
     setRenamingImageId(null);
+    renameValueRef.current = '';
     setRenameValue('');
-  };
+  }, []);
 
   // Handle double-click on image name
-  const handleNameDoubleClick = (e, image, index) => {
+  const handleNameDoubleClick = useCallback((e, image, index) => {
     e.stopPropagation();
     const currentName = image.name || `${index + 1}.jpg`;
     setRenamingImageId(image.id);
+    renameValueRef.current = currentName;
     setRenameValue(currentName);
-  };
+  }, []);
 
   // Context menu items
   const getContextMenuItems = () => {
@@ -177,146 +181,28 @@ export const ThumbnailGrid = ({
           gridTemplateColumns: `repeat(auto-fill, minmax(${thumbSize}px, 1fr))`
         }}
       >
-        {images.map((image, index) => {
-          const isSelected = selectedImageIds.has(image.id);
-          const isCurrent = index === currentIndex;
-          const isProcessing = processingImageIds.has(image.id);
-
-          return (
-            <div
-              key={image.id}
-              className={`
-                relative group cursor-pointer rounded-lg overflow-hidden
-                transition-all duration-200
-                ${isCurrent ? 'ring-2 ring-primary scale-105' : 'hover:scale-105'}
-                ${isSelected ? 'ring-2 ring-blue-500' : ''}
-              `}
-              style={{
-                aspectRatio: '1',
-                height: `${thumbSize}px`,
-                // Skip rendering/decoding work for off-screen thumbnails.
-                // intrinsic size matches the fixed cell so scroll height stays stable.
-                contentVisibility: 'auto',
-                containIntrinsicSize: `${thumbSize}px ${thumbSize}px`
-              }}
-              onClick={(e) => {
-                if (isMultiSelectMode) {
-                  e.preventDefault();
-                  onToggleSelect?.(image.id);
-                } else {
-                  onSelectImage(index);
-                }
-              }}
-              onContextMenu={(e) => handleContextMenu(e, image, index)}
-            >
-              {/* Thumbnail */}
-              <LazyImage
-                src={image.processedUrl || image.url || image.src}
-                alt={image.name || `Image ${index + 1}`}
-                className="w-full h-full"
-                useThumbnail
-                showSpinner={true}
-                hasTransparency={image.hasBackgroundRemoved || !!image.processedUrl}
-              />
-
-              {/* Video markers: center play triangle + bottom-right duration */}
-              {image.isVideo && (
-                <>
-                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                    <div className="w-12 h-12 rounded-full bg-black/45 backdrop-blur-sm flex items-center justify-center group-hover:bg-black/60 transition-colors">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="white" className="ml-0.5">
-                        <path d="M8 5v14l11-7z" />
-                      </svg>
-                    </div>
-                  </div>
-                  {formatDuration(image.duration) && (
-                    <div className="absolute bottom-2 right-2 bg-black/70 text-white text-[11px] font-medium px-1.5 py-0.5 rounded pointer-events-none tabular-nums">
-                      {formatDuration(image.duration)}
-                    </div>
-                  )}
-                </>
-              )}
-
-              {/* Multi-select checkbox */}
-              {isMultiSelectMode && (
-                <div className="absolute top-2 right-2 z-10">
-                  <div
-                    className={`
-                      w-6 h-6 rounded border-2 flex items-center justify-center
-                      transition-colors duration-200
-                      ${isSelected
-                        ? 'bg-blue-500 border-blue-500'
-                        : 'bg-black/50 border-white/30 group-hover:border-white/60'
-                      }
-                    `}
-                  >
-                    {isSelected && (
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3">
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Image name overlay (on hover or when renaming) */}
-              <div className={`absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2 transition-opacity duration-200 ${
-                renamingImageId === image.id ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
-              }`}>
-                {renamingImageId === image.id ? (
-                  <input
-                    ref={renameInputRef}
-                    type="text"
-                    value={renameValue}
-                    onChange={(e) => setRenameValue(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        handleRenameSubmit();
-                      } else if (e.key === 'Escape') {
-                        handleRenameCancel();
-                      }
-                      e.stopPropagation();
-                    }}
-                    onBlur={handleRenameSubmit}
-                    onClick={(e) => e.stopPropagation()}
-                    className="w-full px-2 py-1 text-xs bg-white/10 text-white border border-white/20 rounded focus:outline-none focus:border-primary"
-                  />
-                ) : (
-                  <p
-                    className="text-xs text-white/90 truncate cursor-text"
-                    onDoubleClick={(e) => handleNameDoubleClick(e, image, index)}
-                  >
-                    {image.name || `${index + 1}.jpg`}
-                  </p>
-                )}
-              </div>
-
-              {/* Current indicator badge */}
-              {isCurrent && !isMultiSelectMode && (
-                <div className="absolute top-2 left-2 bg-primary px-2 py-0.5 rounded text-xs font-medium">
-                  Current
-                </div>
-              )}
-
-              {/* Background removed indicator */}
-              {image.hasBackgroundRemoved && !isProcessing && (
-                <div className="absolute bottom-2 right-2 bg-green-500/90 p-1 rounded backdrop-blur-sm" title="Background removed">
-                  <Scissors size={12} className="text-white" />
-                </div>
-              )}
-
-              {/* Processing indicator */}
-              {isProcessing && (
-                <div className="absolute inset-0 bg-black/60 flex items-center justify-center backdrop-blur-sm">
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="w-8 h-8 border-3 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span className="text-xs text-white/80">Processing...</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
+        {images.map((image, index) => (
+          <ThumbnailGridCell
+            key={image.id}
+            image={image}
+            index={index}
+            thumbSize={thumbSize}
+            isCurrent={index === currentIndex}
+            isSelected={selectedImageIds.has(image.id)}
+            isProcessing={processingImageIds.has(image.id)}
+            isMultiSelectMode={isMultiSelectMode}
+            isRenaming={renamingImageId === image.id}
+            renameValue={renameValue}
+            renameInputRef={renameInputRef}
+            onSelect={onSelectImage}
+            onToggleSelect={onToggleSelect}
+            onContextMenu={handleContextMenu}
+            onNameDoubleClick={handleNameDoubleClick}
+            onRenameChange={handleRenameChange}
+            onRenameSubmit={handleRenameSubmit}
+            onRenameCancel={handleRenameCancel}
+          />
+        ))}
       </div>
 
       {/* Empty state */}
@@ -340,4 +226,6 @@ export const ThumbnailGrid = ({
       />
     </div>
   );
-};
+});
+
+ThumbnailGrid.displayName = 'ThumbnailGrid';

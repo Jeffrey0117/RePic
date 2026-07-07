@@ -46,11 +46,22 @@ export const prefetchWindow = (urls, currentIndex) => {
 
   console.log(`[PrefetchManager] Prefetching ${urlsToFetch.length} images around index ${currentIndex}`);
 
+  // Clear this batch's still-pending URLs. Runs on the terminal event AND
+  // when the batch is superseded — the stale-batch guard below otherwise
+  // returns before the terminal event could clean up, stranding those URLs.
+  const clearBatch = () => {
+    for (const url of urlsToFetch) pendingUrls.delete(url);
+  };
+
   // Start streaming prefetch
   electronAPI.prefetchImages(urlsToFetch, {
     onProgress: (item) => {
-      // Check if this prefetch is still valid
-      if (myPrefetchId !== currentPrefetchId) return;
+      // Superseded by a newer prefetch — release this batch's pending URLs
+      // so they can be retried, then stop processing its events.
+      if (myPrefetchId !== currentPrefetchId) {
+        clearBatch();
+        return;
+      }
 
       if (item.type === 'summary') {
         console.log(`[PrefetchManager] Complete: ${item.completed}/${item.completed + item.failed}`);
@@ -61,7 +72,7 @@ export const prefetchWindow = (urls, currentIndex) => {
       // clear everything still pending from THIS batch so those URLs can be
       // retried — they used to stay stuck in pendingUrls forever.
       if (item.type === 'complete' || (item.type === 'error' && !item.url)) {
-        for (const url of urlsToFetch) pendingUrls.delete(url);
+        clearBatch();
         return;
       }
 

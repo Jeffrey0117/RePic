@@ -161,6 +161,7 @@
   "refreshed": "Refreshed",
   "imageReloaded": "Image reloaded",
   "albumsLoadFailed": "Album data could not be read — a backup of the raw data was saved",
+  "exportFailedCount": "failed",
   "importSuccess": "Import successful",
   "importFailed": "Import failed",
   "removeBackground": "Remove Background",

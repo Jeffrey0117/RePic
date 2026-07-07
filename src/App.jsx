@@ -2499,8 +2499,11 @@ function App() {
         isOpen={showExportDialog}
         onClose={() => setShowExportDialog(false)}
         album={selectedAlbum}
-        onExportComplete={(count) => {
-          setToast({ visible: true, message: t('exportSuccess', { count }) });
+        onExportComplete={(count, failed = 0) => {
+          const msg = failed > 0
+            ? `${t('exportSuccess', { count })} (${failed} ${t('exportFailedCount') || 'failed'})`
+            : t('exportSuccess', { count });
+          setToast({ visible: true, message: msg });
         }}
       />
 

@@ -137,14 +137,30 @@ export const LazyImage = memo(({
         }
     }, [src, useThumbnail]);
 
-    // Background caching: for HTTP URLs displayed natively, cache base64 for offline
+    // Background caching: for HTTP URLs displayed natively, cache base64 for
+    // offline — but only once the element is actually near the viewport.
+    // Firing this for every image in a large album kicked off hundreds of
+    // full-resolution downloads up front; gate it on visibility instead.
     useEffect(() => {
         if (!src?.startsWith('http')) return;
-        // Skip if already cached as base64
         if (getCached(src) || getCachedThumbnail(src)) return;
 
-        // Cache in background at low priority (don't block display)
-        loadImage(src, PRIORITY_LOW).catch(() => {});
+        const el = imgRef.current;
+        const cacheNow = () => { loadImage(src, PRIORITY_LOW).catch(() => {}); };
+
+        if (!el || typeof IntersectionObserver === 'undefined') {
+            cacheNow();
+            return;
+        }
+
+        const observer = new IntersectionObserver((entries) => {
+            if (entries.some(e => e.isIntersecting)) {
+                observer.disconnect();
+                cacheNow();
+            }
+        }, { rootMargin: '200px' });
+        observer.observe(el);
+        return () => observer.disconnect();
     }, [src]);
 
     // Handle .repic virtual image files

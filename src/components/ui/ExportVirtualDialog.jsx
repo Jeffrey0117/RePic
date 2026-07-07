@@ -40,7 +40,9 @@ export const ExportVirtualDialog = ({
       const result = await electronAPI.writeRepicFilesBatch(targetFolder, files);
 
       if (result.success) {
-        onExportComplete?.(result.count);
+        // A batch can partially succeed — surface how many were dropped
+        // rather than silently reporting only the successful count.
+        onExportComplete?.(result.count, result.failed || 0);
         onClose();
       } else {
         throw new Error(result.error);
