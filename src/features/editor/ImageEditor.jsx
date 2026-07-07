@@ -285,11 +285,11 @@ export const ImageEditor = ({
                     : 'bg-primary text-white hover:bg-blue-600'
               }`}
             >
-              {isRemovingBg ? '處理中...' : removedBgImage ? '✓ 去背完成' : '一鍵去背'}
+              {isRemovingBg ? t('removingBackground') : removedBgImage ? t('backgroundRemoved') : t('removeBackground')}
             </button>
             {removedBgImage && (
               <p className={`text-xs ${isDark ? 'text-white/40' : 'text-black/40'}`}>
-                背景已移除，點擊「完成」保存
+                {t('backgroundRemovedHint')}
               </p>
             )}
           </div>

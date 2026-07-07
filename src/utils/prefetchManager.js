@@ -57,6 +57,14 @@ export const prefetchWindow = (urls, currentIndex) => {
         return;
       }
 
+      // Terminal event (process exited) or an error item without a url:
+      // clear everything still pending from THIS batch so those URLs can be
+      // retried — they used to stay stuck in pendingUrls forever.
+      if (item.type === 'complete' || (item.type === 'error' && !item.url)) {
+        for (const url of urlsToFetch) pendingUrls.delete(url);
+        return;
+      }
+
       pendingUrls.delete(item.url);
 
       if (item.success && item.localPath) {

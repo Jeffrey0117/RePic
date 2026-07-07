@@ -94,12 +94,21 @@ function setupAutoUpdater() {
     autoUpdater.checkForUpdates().catch((e) => console.error('[updater] check failed:', e?.message || e));
 }
 
-// Temp directory for drag & drop
+// Temp directories: drag & drop downloads + prefetch cache
 const TEMP_DIR = path.join(os.tmpdir(), 'repic-temp');
+const PREFETCH_DIR = path.join(os.tmpdir(), 'repic-prefetch');
 const TEMP_EXPIRY_MS = 60 * 60 * 1000; // 1 hour
 
-// Cache for downloaded URLs (URL -> tempFilePath)
+// Cache for downloaded URLs (URL -> tempFilePath), size-capped below
 const downloadCache = new Map();
+const DOWNLOAD_CACHE_MAX = 500;
+function cacheDownload(url, filePath) {
+    if (downloadCache.size >= DOWNLOAD_CACHE_MAX) {
+        // Maps iterate in insertion order — drop the oldest entry
+        downloadCache.delete(downloadCache.keys().next().value);
+    }
+    downloadCache.set(url, filePath);
+}
 
 // Ensure temp directory exists
 function ensureTempDir() {
@@ -108,22 +117,75 @@ function ensureTempDir() {
     }
 }
 
-// Clean up expired temp files
-function cleanupTempFiles() {
-    try {
-        if (!fs.existsSync(TEMP_DIR)) return;
-        const files = fs.readdirSync(TEMP_DIR);
-        const now = Date.now();
-        for (const file of files) {
-            const filePath = path.join(TEMP_DIR, file);
-            const stats = fs.statSync(filePath);
-            if (now - stats.mtimeMs > TEMP_EXPIRY_MS) {
-                fs.unlinkSync(filePath);
-                console.log('[cleanup] Deleted expired temp file:', file);
-            }
+// Every helper-binary process (Go scraper) is tracked so quit can kill
+// stragglers — previously streaming jobs had no timeout and outlived the app
+// as zombie processes on Windows.
+const activeChildProcs = new Set();
+function spawnTracked(binPath, args, opts) {
+    const proc = spawn(binPath, args, opts);
+    activeChildProcs.add(proc);
+    proc.on('close', () => activeChildProcs.delete(proc));
+    proc.on('error', () => activeChildProcs.delete(proc));
+    return proc;
+}
+function killAllChildProcs() {
+    for (const proc of [...activeChildProcs]) {
+        try {
+            proc.kill();
+        } catch (e) {
+            // already exited
         }
+    }
+}
+
+// Clean up expired temp files in both temp dirs. Interrupted .part files
+// expire like everything else. Runs at startup and hourly — previously the
+// prefetch dir was never cleaned and grew without bound.
+function cleanupTempFiles() {
+    const now = Date.now();
+    for (const dir of [TEMP_DIR, PREFETCH_DIR]) {
+        try {
+            if (!fs.existsSync(dir)) continue;
+            for (const file of fs.readdirSync(dir)) {
+                const filePath = path.join(dir, file);
+                try {
+                    const stats = fs.statSync(filePath);
+                    if (now - stats.mtimeMs > TEMP_EXPIRY_MS) {
+                        fs.unlinkSync(filePath);
+                        console.log('[cleanup] Deleted expired temp file:', file);
+                    }
+                } catch (fileErr) {
+                    // file vanished mid-scan — ignore
+                }
+            }
+        } catch (e) {
+            console.error('[cleanup] Error:', e);
+        }
+    }
+}
+
+// Only allow http(s) to non-local hosts. The renderer can pass arbitrary
+// (scraped) URLs here — without this, a crafted URL could make the app fetch
+// loopback/LAN/cloud-metadata endpoints and hand the body to the renderer.
+// DNS-rebinding is out of scope (no resolution here); this guards literals.
+function isSafeRemoteUrl(rawUrl) {
+    try {
+        const u = new URL(rawUrl);
+        if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+        const host = u.hostname.toLowerCase();
+        if (host === 'localhost' || host === '::1' || host === '[::1]') return false;
+        const m = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+        if (m) {
+            const a = Number(m[1]);
+            const b = Number(m[2]);
+            if (a === 0 || a === 10 || a === 127) return false;
+            if (a === 192 && b === 168) return false;
+            if (a === 172 && b >= 16 && b <= 31) return false;
+            if (a === 169 && b === 254) return false;
+        }
+        return true;
     } catch (e) {
-        console.error('[cleanup] Error:', e);
+        return false;
     }
 }
 
@@ -243,13 +305,23 @@ function normalizeImageUrl(url) {
 }
 
 // Download image from URL to temp file (with cache)
+const MAX_DOWNLOAD_HOPS = 5;
 let requestCounter = 0;
-function downloadToTemp(url) {
+function downloadToTemp(url, hopCount = 0) {
+    // Redirects and HTML→image extraction both recurse; a redirect loop
+    // (A→B→A) previously recursed forever.
+    if (hopCount > MAX_DOWNLOAD_HOPS) {
+        return Promise.reject(new Error('Too many redirects'));
+    }
+    if (!isSafeRemoteUrl(url)) {
+        return Promise.reject(new Error('Blocked URL (non-http(s) or local address)'));
+    }
+
     // Normalize URL first (e.g., GitHub blob -> raw)
     const normalizedUrl = normalizeImageUrl(url);
     if (normalizedUrl !== url) {
         console.log('[downloadToTemp] URL normalized, using:', normalizedUrl);
-        return downloadToTemp(normalizedUrl);
+        return downloadToTemp(normalizedUrl, hopCount + 1);
     }
 
     const reqId = ++requestCounter;
@@ -277,7 +349,7 @@ function downloadToTemp(url) {
         // Check if file already exists (from previous session)
         if (fs.existsSync(tempPath)) {
             console.log(`[downloadToTemp #${reqId}] FILE EXISTS on disk:`, tempPath);
-            downloadCache.set(url, tempPath);
+            cacheDownload(url, tempPath);
             resolve(tempPath);
             return;
         }
@@ -309,7 +381,7 @@ function downloadToTemp(url) {
                     ? response.headers.location
                     : new URL(response.headers.location, url).href;
                 console.log('[downloadToTemp] Redirecting to:', redirectUrl);
-                downloadToTemp(redirectUrl).then(resolve).catch(reject);
+                downloadToTemp(redirectUrl, hopCount + 1).then(resolve).catch(reject);
                 return;
             }
 
@@ -331,10 +403,10 @@ function downloadToTemp(url) {
                     if (imageUrl) {
                         console.log(`[downloadToTemp #${reqId}] Found image URL:`, imageUrl.substring(0, 80) + '...');
                         // Recursively download the actual image, then cache with original URL
-                        downloadToTemp(imageUrl).then((filePath) => {
+                        downloadToTemp(imageUrl, hopCount + 1).then((filePath) => {
                             // Cache original URL to the same file
                             console.log(`[downloadToTemp #${reqId}] Caching original URL to:`, filePath);
-                            downloadCache.set(url, filePath);
+                            cacheDownload(url, filePath);
                             resolve(filePath);
                         }).catch(reject);
                     } else {
@@ -345,18 +417,36 @@ function downloadToTemp(url) {
                 return;
             }
 
-            const fileStream = fs.createWriteStream(tempPath);
+            // Download to a .part file and rename when complete — a crash
+            // mid-download must not leave a half-written file that the
+            // exists-on-disk check above would treat as a finished image.
+            const partPath = `${tempPath}.part`;
+            const fileStream = fs.createWriteStream(partPath);
             response.pipe(fileStream);
 
             fileStream.on('finish', () => {
-                fileStream.close();
-                downloadCache.set(url, tempPath);
-                console.log('[downloadToTemp] Saved to:', tempPath);
-                resolve(tempPath);
+                fileStream.close(() => {
+                    try {
+                        fs.renameSync(partPath, tempPath);
+                    } catch (renameErr) {
+                        fs.unlink(partPath, () => {});
+                        reject(renameErr);
+                        return;
+                    }
+                    cacheDownload(url, tempPath);
+                    console.log('[downloadToTemp] Saved to:', tempPath);
+                    resolve(tempPath);
+                });
             });
 
             fileStream.on('error', (err) => {
-                fs.unlink(tempPath, () => {});
+                fs.unlink(partPath, () => {});
+                reject(err);
+            });
+
+            response.on('error', (err) => {
+                fileStream.destroy();
+                fs.unlink(partPath, () => {});
                 reject(err);
             });
         });
@@ -480,9 +570,9 @@ function imageUrlToPageUrl(url) {
 }
 
 // V8 Startup Optimization
-app.commandLine.appendSwitch('js-flags', '--max-old-space-size=256');
-// Enable V8 code cache for faster startup
-app.commandLine.appendSwitch('js-flags', '--use-strict');
+// NOTE: a second appendSwitch('js-flags', ...) overwrites the first —
+// combine every V8 flag into this single switch.
+app.commandLine.appendSwitch('js-flags', '--max-old-space-size=256 --use-strict');
 app.commandLine.appendSwitch('disable-renderer-backgrounding');
 
 let mainWindow;
@@ -713,7 +803,7 @@ function setupIpcHandlers() {
                 '--h', String(Math.round(crop.height))
             ];
 
-            const proc = spawn(scraperPath, args);
+            const proc = spawnTracked(scraperPath, args);
             let stdout = '';
 
             proc.stdout.on('data', (data) => { stdout += data.toString(); });
@@ -753,7 +843,7 @@ function setupIpcHandlers() {
                 '--quality', String(quality || 85)
             ];
 
-            const proc = spawn(scraperPath, args);
+            const proc = spawnTracked(scraperPath, args);
             let stdout = '';
 
             proc.stdout.on('data', (data) => { stdout += data.toString(); });
@@ -806,14 +896,20 @@ function setupIpcHandlers() {
     });
 
     // Write .repic file
+    // Atomic write: a crash mid-write must not leave a corrupt .repic file.
+    const writeFileAtomic = async (filePath, content) => {
+        const tmpPath = `${filePath}.tmp`;
+        await fs.promises.writeFile(tmpPath, content, 'utf-8');
+        await fs.promises.rename(tmpPath, filePath);
+    };
+
     ipcMain.handle('write-repic-file', async (event, filePath, data) => {
         if (!isValidPath(filePath)) {
             return { success: false, error: 'Invalid file path' };
         }
         try {
             const finalData = await withEmbeddedThumb(data);
-            const content = JSON.stringify(finalData, null, 2);
-            await fs.promises.writeFile(filePath, content, 'utf-8');
+            await writeFileAtomic(filePath, JSON.stringify(finalData, null, 2));
             return { success: true };
         } catch (e) {
             console.error('Failed to write .repic file:', e);
@@ -821,7 +917,8 @@ function setupIpcHandlers() {
         }
     });
 
-    // Write multiple .repic files (batch export)
+    // Write multiple .repic files (batch export). Per-file failures are
+    // collected instead of aborting the whole batch mid-list.
     ipcMain.handle('write-repic-files-batch', async (event, { folderPath, files }) => {
         if (!isValidPath(folderPath)) {
             return { success: false, error: 'Invalid folder path' };
@@ -839,11 +936,16 @@ function setupIpcHandlers() {
             const results = [];
             for (let i = 0; i < files.length; i++) {
                 const filePath = path.join(folderPath, files[i].filename);
-                const content = JSON.stringify(dataWithThumbs[i], null, 2);
-                await fs.promises.writeFile(filePath, content, 'utf-8');
-                results.push({ filename: files[i].filename, success: true });
+                try {
+                    await writeFileAtomic(filePath, JSON.stringify(dataWithThumbs[i], null, 2));
+                    results.push({ filename: files[i].filename, success: true });
+                } catch (fileErr) {
+                    console.error('Failed to write .repic file:', files[i].filename, fileErr);
+                    results.push({ filename: files[i].filename, success: false, error: fileErr.message });
+                }
             }
-            return { success: true, count: results.length };
+            const okCount = results.filter(r => r.success).length;
+            return { success: okCount > 0, count: okCount, failed: results.length - okCount, results };
         } catch (e) {
             console.error('Failed to write .repic files:', e);
             return { success: false, error: e.message };
@@ -965,12 +1067,16 @@ function setupIpcHandlers() {
         try {
             const filePath = await downloadToTemp(url);
             // Read the file and return as base64
-            const buffer = fs.readFileSync(filePath);
+            const buffer = await fs.promises.readFile(filePath);
 
             // Check if the file is actually an image (not HTML)
             const firstBytes = buffer.slice(0, 20).toString('utf-8');
             if (firstBytes.includes('<!DOCTYPE') || firstBytes.includes('<html')) {
                 console.error('[proxy-image] Received HTML instead of image');
+                // Evict the poisoned entry — a transient error page must not
+                // make this URL fail for the rest of the session.
+                downloadCache.delete(url);
+                fs.unlink(filePath, () => {});
                 return { success: false, error: 'URL returned HTML, not an image' };
             }
 
@@ -1267,7 +1373,7 @@ function setupIpcHandlers() {
             }
 
             console.log('[scrape-images] Using Go scraper');
-            const proc = spawn(scraperPath, ['--url', url]);
+            const proc = spawnTracked(scraperPath, ['--url', url]);
             let stdout = '';
             let stderr = '';
 
@@ -1322,7 +1428,7 @@ function setupIpcHandlers() {
             console.log('[batch-download] Using Go downloader for', urls.length, 'images');
             const startTime = Date.now();
 
-            const proc = spawn(scraperPath, [
+            const proc = spawnTracked(scraperPath, [
                 '--download',
                 '--urls', urls.join(','),
                 '--output', outputDir,
@@ -1373,6 +1479,8 @@ function setupIpcHandlers() {
 
     // Batch download IPC handler
     ipcMain.handle('batch-download-images', async (event, { urls, outputDir, concurrency }) => {
+        urls = (urls || []).filter(isSafeRemoteUrl);
+        if (urls.length === 0) return { success: false, error: 'No valid URLs' };
         console.log('[batch-download-images] Request:', urls.length, 'images to', outputDir);
 
         // Ensure output directory exists
@@ -1445,7 +1553,7 @@ function setupIpcHandlers() {
                 args.push('--output', outputDir);
             }
 
-            const proc = spawn(scraperPath, args);
+            const proc = spawnTracked(scraperPath, args);
             let stdout = '';
             let stderr = '';
 
@@ -1523,7 +1631,7 @@ function setupIpcHandlers() {
             '--base64'
         ];
 
-        const proc = spawn(scraperPath, args);
+        const proc = spawnTracked(scraperPath, args);
         let buffer = '';
 
         proc.stdout.on('data', (data) => {
@@ -1577,8 +1685,11 @@ function setupIpcHandlers() {
             return { success: false, error: 'Go processor not found' };
         }
 
-        // Use a dedicated prefetch temp directory
-        const prefetchDir = path.join(os.tmpdir(), 'repic-prefetch');
+        urls = (urls || []).filter(isSafeRemoteUrl);
+        if (urls.length === 0) return { success: false, error: 'No valid URLs' };
+
+        // Use a dedicated prefetch temp directory (cleaned by cleanupTempFiles)
+        const prefetchDir = PREFETCH_DIR;
 
         console.log('[prefetch-images] Starting prefetch for', urls.length, 'images to', prefetchDir);
 
@@ -1589,7 +1700,7 @@ function setupIpcHandlers() {
             '--concurrency', '16'  // High concurrency for speed
         ];
 
-        const proc = spawn(scraperPath, args);
+        const proc = spawnTracked(scraperPath, args);
         let buffer = '';
 
         proc.stdout.on('data', (data) => {
@@ -1621,6 +1732,9 @@ function setupIpcHandlers() {
                 } catch (e) {}
             }
             console.log('[prefetch-images] Complete, exit code:', code);
+            // Terminal event so the renderer can clear still-pending URLs —
+            // without it a killed/crashed process left them stuck forever.
+            event.sender.send('prefetch-ready', { requestId, item: { type: 'complete', code } });
         });
 
         proc.on('error', (err) => {
@@ -1633,6 +1747,9 @@ function setupIpcHandlers() {
 
     // Scrape images from webpage URL - IPC handler
     ipcMain.handle('scrape-images', async (event, url) => {
+        if (!isSafeRemoteUrl(url)) {
+            return { success: false, error: 'Blocked URL (non-http(s) or local address)' };
+        }
         // Try Go scraper first
         const goResult = await scrapeWithGo(url);
         if (goResult && goResult.success) {
@@ -1820,18 +1937,22 @@ app.whenReady().then(() => {
     // Get file from command line (for file association)
     fileToOpen = getFileFromArgs();
 
-    // Clean up old temp files on startup
+    // Clean up old temp files on startup and hourly — a long-running session
+    // previously never cleaned either temp dir again.
     cleanupTempFiles();
+    setInterval(cleanupTempFiles, TEMP_EXPIRY_MS);
 
     // Configure session to bypass third-party cookie restrictions
     const ses = session.defaultSession;
 
-    // Remove Referer header and add necessary headers for image requests
+    // Remove Referer header for IMAGE requests only, to bypass hotlink
+    // protection. Scoping matters: stripping it on every request broke
+    // Referer/Accept-sensitive API calls (auth, uploads).
     ses.webRequest.onBeforeSendHeaders({ urls: ['*://*/*'] }, (details, callback) => {
-        // Remove Referer to bypass hotlink protection
-        delete details.requestHeaders['Referer'];
-        // Add headers that some sites require
-        details.requestHeaders['Accept'] = 'image/webp,image/apng,image/*,*/*;q=0.8';
+        if (details.resourceType === 'image') {
+            delete details.requestHeaders['Referer'];
+            details.requestHeaders['Accept'] = 'image/webp,image/apng,image/*,*/*;q=0.8';
+        }
         callback({ requestHeaders: details.requestHeaders });
     });
 
@@ -1850,4 +1971,11 @@ app.on('window-all-closed', () => {
     if (process.platform !== 'darwin') {
         app.quit();
     }
+});
+
+// Kill any still-running helper processes (Go scraper jobs) — spawn()
+// children are not in the parent's job object on Windows and would
+// otherwise survive as zombies.
+app.on('before-quit', () => {
+    killAllChildProcs();
 });

@@ -54,6 +54,7 @@ function App() {
   // Web album hook
   const {
     albums,
+    loadFailed: albumsLoadFailed,
     selectedAlbum,
     selectedAlbumId,
     selectAlbum,
@@ -111,6 +112,13 @@ function App() {
 
   // Toast state
   const [toast, setToast] = useState({ visible: false, message: '' });
+
+  // Stored albums were corrupt — a raw backup was kept; tell the user.
+  useEffect(() => {
+    if (albumsLoadFailed) {
+      setToast({ visible: true, message: t('albumsLoadFailed') || '相簿資料讀取失敗，已備份原始資料' });
+    }
+  }, [albumsLoadFailed, t]);
 
   // Upload state
   const [isUploading, setIsUploading] = useState(false);
@@ -2089,9 +2097,9 @@ function App() {
             onImportAlbums={(json) => {
               const result = importAlbums(json);
               if (result.success) {
-                setToast({ visible: true, message: `匯入成功 (${result.count} 個相簿)` });
+                setToast({ visible: true, message: `${t('importSuccess')} (${result.count})` });
               } else {
-                setToast({ visible: true, message: `匯入失敗: ${result.error}` });
+                setToast({ visible: true, message: `${t('importFailed')}: ${result.error}` });
               }
             }}
             onContextMenu={handleAlbumContextMenu}

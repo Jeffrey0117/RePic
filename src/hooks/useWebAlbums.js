@@ -1,26 +1,52 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { cancelAll } from '../utils/imageLoader';
 
 const STORAGE_KEY = 'repic-web-albums';
+const BACKUP_KEY = `${STORAGE_KEY}-corrupt-backup`;
 const SOFT_DELETE_DAYS = 7; // Days before permanent deletion
 const SOFT_DELETE_MS = SOFT_DELETE_DAYS * 24 * 60 * 60 * 1000;
 
 // Generate unique ID
 const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
+// Coerce untrusted album data (storage or import) into the expected shape.
+// A hand-edited backup or interrupted write must never crash the app or be
+// persisted as-is: albums without an images array get an empty one, and
+// non-object entries are dropped entirely.
+const normalizeAlbums = (rawAlbums) => {
+  if (!Array.isArray(rawAlbums)) return [];
+  return rawAlbums
+    .filter(album => album && typeof album === 'object')
+    .map(album => ({
+      ...album,
+      id: album.id || generateId(),
+      name: typeof album.name === 'string' ? album.name : 'Untitled',
+      images: (Array.isArray(album.images) ? album.images : [])
+        // Drop non-objects and expired blob: URLs (from interrupted paste uploads)
+        .filter(img => img && typeof img === 'object' && !img.url?.startsWith('blob:'))
+    }));
+};
+
+// Set when the stored data existed but could not be parsed. The raw string
+// is preserved under BACKUP_KEY so a bad parse never becomes silent total
+// loss — the debounced save below would otherwise overwrite it with [].
+let _loadFailed = false;
+
 // Load albums from localStorage (for lazy initialization)
 const loadFromStorage = () => {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) return [];
-    const albums = JSON.parse(stored);
-    // Filter out images with expired blob: URLs (from interrupted paste uploads)
-    return albums.map(album => ({
-      ...album,
-      images: album.images.filter(img => !img.url?.startsWith('blob:'))
-    }));
+    return normalizeAlbums(JSON.parse(stored));
   } catch (e) {
     console.error('[useWebAlbums] Failed to load from localStorage:', e);
+    _loadFailed = true;
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw != null) localStorage.setItem(BACKUP_KEY, raw);
+    } catch (backupErr) {
+      console.error('[useWebAlbums] Could not back up corrupt store:', backupErr);
+    }
     return [];
   }
 };
@@ -70,8 +96,11 @@ export const useWebAlbums = () => {
   });
 
   // Save albums to localStorage whenever they change (debounced)
+  const pendingSaveRef = useRef(null);
   useEffect(() => {
+    pendingSaveRef.current = albums;
     const timeoutId = setTimeout(() => {
+      pendingSaveRef.current = null;
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(albums));
       } catch (e) {
@@ -81,6 +110,29 @@ export const useWebAlbums = () => {
 
     return () => clearTimeout(timeoutId);
   }, [albums]);
+
+  // Flush a still-debounced save when the window closes, so quitting the app
+  // right after a change doesn't drop it. localStorage is synchronous, so
+  // this is safe inside pagehide.
+  useEffect(() => {
+    const flush = () => {
+      const pending = pendingSaveRef.current;
+      if (pending == null) return;
+      pendingSaveRef.current = null;
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(pending));
+      } catch (e) {
+        console.error('[useWebAlbums] Failed to flush on close:', e);
+      }
+    };
+    window.addEventListener('pagehide', flush);
+    window.addEventListener('beforeunload', flush);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      window.removeEventListener('beforeunload', flush);
+      flush();
+    };
+  }, []);
 
   // Periodic cleanup of expired images (every hour)
   useEffect(() => {
@@ -346,26 +398,33 @@ export const useWebAlbums = () => {
     URL.revokeObjectURL(url);
   }, [albums]);
 
-  // Import albums from JSON
+  // Import albums from JSON. Every album is normalized before it touches
+  // state — a malformed backup (album without an images array) previously
+  // crashed the render AND got persisted, wiping the store on next launch.
   const importAlbums = useCallback((jsonData, mode = 'merge') => {
     try {
       const data = typeof jsonData === 'string' ? JSON.parse(jsonData) : jsonData;
-      if (!data.albums || !Array.isArray(data.albums)) {
+      if (!data || !Array.isArray(data.albums)) {
         throw new Error('Invalid format');
       }
 
+      const imported = normalizeAlbums(data.albums);
+      if (imported.length === 0) {
+        throw new Error('No valid albums in file');
+      }
+
       if (mode === 'replace') {
-        setAlbums(data.albums);
-        setSelectedAlbumId(data.albums.length > 0 ? data.albums[0].id : null);
+        setAlbums(imported);
+        setSelectedAlbumId(imported[0].id);
       } else {
         // Merge: add albums that don't exist by name
         setAlbums(prev => {
           const existingNames = new Set(prev.map(a => a.name));
-          const newAlbums = data.albums.filter(a => !existingNames.has(a.name));
+          const newAlbums = imported.filter(a => !existingNames.has(a.name));
           return [...prev, ...newAlbums];
         });
       }
-      return { success: true, count: data.albums.length };
+      return { success: true, count: imported.length };
     } catch (e) {
       console.error('[importAlbums] Error:', e);
       return { success: false, error: e.message };
@@ -374,6 +433,9 @@ export const useWebAlbums = () => {
 
   return {
     albums,
+    // True when the stored album data was corrupt; the raw string was
+    // preserved under `repic-web-albums-corrupt-backup` for manual recovery.
+    loadFailed: _loadFailed,
     selectedAlbum,
     selectedAlbumId,
     selectAlbum,
