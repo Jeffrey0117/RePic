@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo, memo } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
 import { getThumbnail, saveThumbnail, generateThumbnail } from '../../utils/thumbnailCache';
 import { getCachedImage, cacheImage } from '../../utils/offlineCache';
 import { preloadImages, preloadThumbnails, getCached } from '../../utils/imageLoader';
@@ -26,7 +26,7 @@ const proxyCache = new Map();
 // Memory cache for thumbnails (faster than IndexedDB for current session)
 const thumbMemCache = new Map();
 
-export const Sidebar = memo(function Sidebar({
+export const Sidebar = ({
     files,
     currentIndex,
     onSelect,
@@ -46,7 +46,7 @@ export const Sidebar = memo(function Sidebar({
     onReorder,
     onContextMenu,
     position = 'left' // 'left' or 'bottom'
-}) {
+}) => {
     const isHorizontal = position === 'bottom';
     const scrollContainerRef = useRef(null);
     // Cache for .repic file data (url + crop)
@@ -798,6 +798,4 @@ export const Sidebar = memo(function Sidebar({
             />
         </div>
     );
-});
-
-Sidebar.displayName = 'Sidebar';
+};

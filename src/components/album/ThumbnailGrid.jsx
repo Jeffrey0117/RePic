@@ -192,7 +192,9 @@ export const ThumbnailGrid = memo(function ThumbnailGrid({
             isProcessing={processingImageIds.has(image.id)}
             isMultiSelectMode={isMultiSelectMode}
             isRenaming={renamingImageId === image.id}
-            renameValue={renameValue}
+            // Only the active cell needs the live value — passing the changing
+            // state to every cell would defeat the memo on each keystroke.
+            renameValue={renamingImageId === image.id ? renameValue : ''}
             renameInputRef={renameInputRef}
             onSelect={onSelectImage}
             onToggleSelect={onToggleSelect}
