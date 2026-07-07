@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, memo } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from '../../lib/motion';
 import {
@@ -172,7 +172,7 @@ const CloudIcon = ({ size = 24, className = '' }) => (
     </svg>
 );
 
-export const TopBar = ({
+export const TopBar = memo(function TopBar({
     currentPath,
     onOpenFolder,
     showInfoPanel,
@@ -216,7 +216,7 @@ export const TopBar = ({
     // Grid/Image view toggle
     currentViewMode,
     onToggleViewLayout
-}) => {
+}) {
     const { t, language, setLanguage } = useI18n();
     const { theme, toggleTheme } = useTheme();
     const [urlInput, setUrlInput] = useState('');
@@ -716,7 +716,9 @@ export const TopBar = ({
             )}
         </motion.div>
     );
-};
+});
+
+TopBar.displayName = 'TopBar';
 
 // Toolbar button component
 const ToolbarButton = ({

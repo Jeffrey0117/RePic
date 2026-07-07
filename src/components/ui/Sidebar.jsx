@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo, memo } from 'react';
 import { getThumbnail, saveThumbnail, generateThumbnail } from '../../utils/thumbnailCache';
 import { getCachedImage, cacheImage } from '../../utils/offlineCache';
 import { preloadImages, preloadThumbnails, getCached } from '../../utils/imageLoader';
@@ -26,7 +26,7 @@ const proxyCache = new Map();
 // Memory cache for thumbnails (faster than IndexedDB for current session)
 const thumbMemCache = new Map();
 
-export const Sidebar = ({
+export const Sidebar = memo(function Sidebar({
     files,
     currentIndex,
     onSelect,
@@ -46,7 +46,7 @@ export const Sidebar = ({
     onReorder,
     onContextMenu,
     position = 'left' // 'left' or 'bottom'
-}) => {
+}) {
     const isHorizontal = position === 'bottom';
     const scrollContainerRef = useRef(null);
     // Cache for .repic file data (url + crop)
@@ -61,8 +61,29 @@ export const Sidebar = ({
     const [dragScrollStart, setDragScrollStart] = useState({ x: 0, y: 0, scrollX: 0, scrollY: 0 });
     // Track failed images (after proxy also failed)
     const [failedImages, setFailedImages] = useState(new Set());
-    // Cached thumbnails for local files
+    // Cached thumbnails for local files. Incoming thumbnails are buffered in a
+    // ref and flushed to state in batches — a per-thumbnail setState spread was
+    // O(N²) (each of N completions copied the whole growing object) and
+    // re-rendered the entire sidebar N times as a folder streamed in.
     const [cachedThumbs, setCachedThumbs] = useState({});
+    // Mirror currentIndex so the thumbnail effect can read it for priority
+    // sorting without depending on it (navigation shouldn't re-scan).
+    const currentIndexRef = useRef(currentIndex);
+    currentIndexRef.current = currentIndex;
+    const thumbBufferRef = useRef(null);
+    const thumbFlushRef = useRef(null);
+    const queueThumb = useCallback((key, value) => {
+        if (!thumbBufferRef.current) thumbBufferRef.current = {};
+        thumbBufferRef.current[key] = value;
+        if (thumbFlushRef.current) return;
+        thumbFlushRef.current = setTimeout(() => {
+            const batch = thumbBufferRef.current;
+            thumbBufferRef.current = null;
+            thumbFlushRef.current = null;
+            if (batch) setCachedThumbs(prev => ({ ...prev, ...batch }));
+        }, 100);
+    }, []);
+    useEffect(() => () => clearTimeout(thumbFlushRef.current), []);
     // Track images with transparency
     const [transparentImages, setTransparentImages] = useState(new Set());
     // Separate width (for left) and height (for bottom)
@@ -330,14 +351,17 @@ export const Sidebar = ({
 
             if (needThumbs.length === 0) return;
 
-            // Sort by priority: closest to currentIndex first.
+            // Sort by priority: closest to the current image first. Read the
+            // index from a ref so navigating doesn't re-run this whole effect
+            // (and re-scan IndexedDB) on every arrow-key press.
             // Precompute file->index once (O(n)) so the comparator is O(1) instead of
             // calling files.indexOf() twice per comparison (O(n^2 log n) overall).
+            const focusIndex = currentIndexRef.current;
             const indexMap = new Map(files.map((f, i) => [f, i]));
             const sortedFiles = [...needThumbs].sort((a, b) => {
                 const idxA = indexMap.get(a);
                 const idxB = indexMap.get(b);
-                return Math.abs(idxA - currentIndex) - Math.abs(idxB - currentIndex);
+                return Math.abs(idxA - focusIndex) - Math.abs(idxB - focusIndex);
             });
 
             // First: check IndexedDB cache for all files
@@ -347,7 +371,7 @@ export const Sidebar = ({
                     const cached = await getThumbnail(file, cacheVersion);
                     if (cached) {
                         thumbMemCache.set(file, cached);
-                        setCachedThumbs(prev => ({ ...prev, [file]: cached }));
+                        queueThumb(file, cached);
                     } else {
                         uncached.push(file);
                     }
@@ -372,7 +396,7 @@ export const Sidebar = ({
                         if (item.success && item.base64) {
                             const base64Url = item.base64.startsWith('data:') ? item.base64 : `data:image/jpeg;base64,${item.base64}`;
                             thumbMemCache.set(item.source, base64Url);
-                            setCachedThumbs(prev => ({ ...prev, [item.source]: base64Url }));
+                            queueThumb(item.source, base64Url);
                             // Save to IndexedDB (async)
                             saveThumbnail(item.source, cacheVersion, base64Url);
                         }
@@ -385,7 +409,7 @@ export const Sidebar = ({
                         const thumb = await generateThumbnail(`file://${file}`);
                         if (thumb) {
                             thumbMemCache.set(file, thumb);
-                            setCachedThumbs(prev => ({ ...prev, [file]: thumb }));
+                            queueThumb(file, thumb);
                             saveThumbnail(file, cacheVersion, thumb);
                         }
                     } catch (e) {}
@@ -394,7 +418,7 @@ export const Sidebar = ({
         };
 
         loadThumbnails();
-    }, [files, mode, cacheVersion, currentIndex]);
+    }, [files, mode, cacheVersion]);
 
     // Preload ALL thumbnails from cache when album changes (instant display)
     useEffect(() => {
@@ -774,4 +798,6 @@ export const Sidebar = ({
             />
         </div>
     );
-};
+});
+
+Sidebar.displayName = 'Sidebar';

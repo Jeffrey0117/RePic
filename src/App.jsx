@@ -1075,6 +1075,23 @@ function App() {
   }, [selectedAlbumId, renameAlbumImage, t]);
 
   // Handle rename local file
+  // Display objects for the local grid. Memoized on `files` so a basename is
+  // computed once per file (not per render, per file, across the contextBridge)
+  // and the array identity is stable — otherwise the memoized ThumbnailGrid
+  // would re-render on every unrelated App state change.
+  const localGridImages = useMemo(() => {
+    const electronAPI = getElectronAPI();
+    return files.map((file, idx) => {
+      const name = electronAPI?.path?.basename(file) || file.split(/[\\/]/).pop() || `Image ${idx + 1}`;
+      return { id: idx, url: file, src: file, name };
+    });
+  }, [files]);
+
+  const handleSelectLocalGridImage = useCallback((index) => {
+    selectImage(index);
+    setLocalViewMode('image');
+  }, [selectImage]);
+
   const handleRenameLocalFile = useCallback(async (fileId, newName) => {
     const electronAPI = getElectronAPI();
     if (!electronAPI || !currentPath) return;
@@ -2210,16 +2227,9 @@ function App() {
               style={{ display: localViewMode === 'grid' ? 'block' : 'none' }}
             >
               <ThumbnailGrid
-                images={files.map((file, idx) => {
-                  const electronAPI = getElectronAPI();
-                  const name = electronAPI?.path?.basename(file) || file.split(/[\\/]/).pop() || `Image ${idx + 1}`;
-                  return { id: idx, url: file, src: file, name };
-                })}
+                images={localGridImages}
                 currentIndex={currentIndex}
-                onSelectImage={(index) => {
-                  selectImage(index);
-                  setLocalViewMode('image');
-                }}
+                onSelectImage={handleSelectLocalGridImage}
                 size={gridSize}
                 onRenameImage={handleRenameLocalFile}
               />
