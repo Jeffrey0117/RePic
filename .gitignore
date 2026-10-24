@@ -37,3 +37,7 @@ scraper/*_benchmark.*
 # Temporary files
 temp_*.jpg
 temp_*.png
+
+.env
+.env.*
+!.env.example
