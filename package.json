@@ -130,6 +130,7 @@
   },
   "dependencies": {
     "electron-updater": "^6.8.3",
+    "family-kit": "github:Jeffrey0117/family-kit#30158a3",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-image-crop": "^11.0.10",

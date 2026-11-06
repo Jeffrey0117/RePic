@@ -18,6 +18,19 @@ function isValidBase64Data(data) {
     return data.startsWith('data:image/');
 }
 
+// 鴨鴨家族面板（family-kit）：清單 / 安裝 / 開啟 / 前往下載 / 下載進度
+contextBridge.exposeInMainWorld('familyKit', {
+    list: (options) => ipcRenderer.invoke('family:list', options),
+    install: (id) => ipcRenderer.invoke('family:install', String(id)),
+    open: (id) => ipcRenderer.invoke('family:open', String(id)),
+    page: (id) => ipcRenderer.invoke('family:page', String(id)),
+    onProgress: (callback) => {
+        const handler = (_event, progress) => callback(progress);
+        ipcRenderer.on('family:progress', handler);
+        return () => ipcRenderer.removeListener('family:progress', handler);
+    },
+});
+
 // Expose protected methods to renderer via contextBridge
 contextBridge.exposeInMainWorld('electronAPI', {
     // Listen for file open events (from file association / command line)

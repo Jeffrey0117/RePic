@@ -2,6 +2,7 @@ import { memo, useEffect } from 'react';
 import { motion, AnimatePresence } from '../../lib/motion';
 import useI18n from '../../hooks/useI18n';
 import { useTheme } from '../../contexts/ThemeContext';
+import { FamilyPanel } from './FamilyPanel';
 
 /**
  * About dialog showing app info, version, and credits
@@ -81,6 +82,14 @@ export const AboutDialog = memo(({ isOpen, onClose }) => {
                 {t('setAsDefaultViewer') || '設為預設圖片檢視器'}
               </button>
             )}
+
+            {/* 鴨鴨家族：同一家的其他 app，一鍵裝好 */}
+            <FamilyPanel
+              isDark={isDark}
+              className="mb-6"
+              title={t('familyTitle') || '鴨鴨家族'}
+              subtitle={t('familySubtitle') || '截圖用 DuckShot、看片用 ReVid'}
+            />
 
             {/* Links */}
             <div className="flex justify-center gap-4 mb-6">

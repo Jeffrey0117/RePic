@@ -1,4 +1,5 @@
-const { app, BrowserWindow, Menu, ipcMain, dialog, nativeImage, session, shell } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, dialog, nativeImage, session, shell, net } = require('electron');
+const createFamily = require('family-kit');
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
@@ -728,6 +729,24 @@ function createWindow() {
 }
 
 function setupIpcHandlers() {
+    // 鴨鴨家族（family-kit）：偵測/一鍵安裝同一家的其他 app；IPC 只信任主視窗
+    try {
+        const family = createFamily({
+            selfId: 'repic',
+            cacheDir: path.join(app.getPath('userData'), 'family-kit'),
+            shell,
+            fetch: (url, init) => net.fetch(url, init),
+            userAgent: `RePic/${app.getVersion()}`,
+            log: (...a) => console.warn('[family]', ...a),
+        });
+        family.registerIpc(ipcMain, {
+            prefix: 'family',
+            isTrusted: (sender) => !!mainWindow && !mainWindow.isDestroyed() && sender === mainWindow.webContents,
+        });
+    } catch (e) {
+        console.warn('[family] init failed:', e.message);
+    }
+
     ipcMain.handle('select-directory', async () => {
         if (!mainWindow) return null;
         const result = await dialog.showOpenDialog(mainWindow, {
