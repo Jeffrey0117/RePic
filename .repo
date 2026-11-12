@@ -1,0 +1,270 @@
+{
+  "repo": 1,
+  "name": "repic",
+  "what": "RePic — desktop image viewer/manager with zero-KB virtual albums",
+  "kind": "service",
+  "work": {
+    "guide": "CLAUDE.md",
+    "run": "npm run dev",
+    "build": "npm run build",
+    "deploy": "git push"
+  },
+  "offers": [
+    {
+      "id": "remove_background",
+      "what": "Remove light gray/white background from an image, returns PNG with transparent background",
+      "how": "http",
+      "http": {
+        "method": "POST",
+        "path": "/api/remove-background",
+        "auth": "bearer",
+        "params": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "description": "Image URL to process"
+            },
+            "base64": {
+              "type": "string",
+              "description": "Base64-encoded image data"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "generate_favicon",
+      "what": "Generate favicon set from an image: 16x16, 32x32, 180x180 (Apple), 192x192, 512x512 (Android). Returns all sizes as base64 PNGs.",
+      "how": "http",
+      "http": {
+        "method": "POST",
+        "path": "/api/favicon",
+        "auth": "bearer",
+        "params": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "description": "Image URL"
+            },
+            "base64": {
+              "type": "string",
+              "description": "Base64-encoded image data"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "resize",
+      "what": "Resize an image to specified dimensions",
+      "how": "http",
+      "http": {
+        "method": "POST",
+        "path": "/api/resize",
+        "auth": "bearer",
+        "params": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "description": "Image URL"
+            },
+            "base64": {
+              "type": "string",
+              "description": "Base64-encoded image data"
+            },
+            "width": {
+              "type": "number",
+              "description": "Target width in pixels"
+            },
+            "height": {
+              "type": "number",
+              "description": "Target height in pixels"
+            },
+            "fit": {
+              "type": "string",
+              "description": "Resize fit mode: contain, cover, fill, inside, outside (default: contain)",
+              "enum": [
+                "contain",
+                "cover",
+                "fill",
+                "inside",
+                "outside"
+              ]
+            },
+            "format": {
+              "type": "string",
+              "description": "Output format (default: png)",
+              "enum": [
+                "png",
+                "jpeg",
+                "webp",
+                "avif"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "convert",
+      "what": "Convert an image to a different format (PNG, JPEG, WebP, AVIF)",
+      "how": "http",
+      "http": {
+        "method": "POST",
+        "path": "/api/convert",
+        "auth": "bearer",
+        "params": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "description": "Image URL"
+            },
+            "base64": {
+              "type": "string",
+              "description": "Base64-encoded image data"
+            },
+            "format": {
+              "type": "string",
+              "description": "Target format",
+              "enum": [
+                "png",
+                "jpeg",
+                "webp",
+                "avif"
+              ]
+            },
+            "quality": {
+              "type": "number",
+              "description": "Quality 1-100 (for JPEG/WebP/AVIF)"
+            }
+          },
+          "required": [
+            "format"
+          ]
+        }
+      }
+    },
+    {
+      "id": "crop",
+      "what": "Crop a region from an image by specifying left, top, width, height in pixels",
+      "how": "http",
+      "http": {
+        "method": "POST",
+        "path": "/api/crop",
+        "auth": "bearer",
+        "params": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "description": "Image URL"
+            },
+            "base64": {
+              "type": "string",
+              "description": "Base64-encoded image data"
+            },
+            "left": {
+              "type": "number",
+              "description": "Left offset in pixels"
+            },
+            "top": {
+              "type": "number",
+              "description": "Top offset in pixels"
+            },
+            "width": {
+              "type": "number",
+              "description": "Crop width in pixels"
+            },
+            "height": {
+              "type": "number",
+              "description": "Crop height in pixels"
+            }
+          },
+          "required": [
+            "left",
+            "top",
+            "width",
+            "height"
+          ]
+        }
+      }
+    },
+    {
+      "id": "metadata",
+      "what": "Get image metadata: width, height, format, channels, hasAlpha, file size",
+      "how": "http",
+      "http": {
+        "method": "POST",
+        "path": "/api/metadata",
+        "auth": "bearer",
+        "params": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "description": "Image URL"
+            },
+            "base64": {
+              "type": "string",
+              "description": "Base64-encoded image data"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "composite",
+      "what": "Overlay/watermark one image onto another. Specify gravity for positioning.",
+      "how": "http",
+      "http": {
+        "method": "POST",
+        "path": "/api/composite",
+        "auth": "bearer",
+        "params": {
+          "type": "object",
+          "properties": {
+            "url": {
+              "type": "string",
+              "description": "Base image URL"
+            },
+            "base64": {
+              "type": "string",
+              "description": "Base image as base64"
+            },
+            "overlay_url": {
+              "type": "string",
+              "description": "Overlay/watermark image URL"
+            },
+            "overlay_base64": {
+              "type": "string",
+              "description": "Overlay/watermark image as base64"
+            },
+            "gravity": {
+              "type": "string",
+              "description": "Position: north, south, east, west, northeast, northwest, southeast, southwest, centre (default: southeast)",
+              "enum": [
+                "north",
+                "south",
+                "east",
+                "west",
+                "northeast",
+                "northwest",
+                "southeast",
+                "southwest",
+                "centre"
+              ]
+            },
+            "opacity": {
+              "type": "number",
+              "description": "Overlay opacity 0-1 (default: 1)"
+            }
+          }
+        }
+      }
+    }
+  ]
+}
